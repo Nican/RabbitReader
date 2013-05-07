@@ -1,0 +1,8 @@
+name: RabbitReader
+description: A sample WebUI application
+dependencies:
+  browser: any
+  js: any
+  dart_web_toolkit: 
+    path: C:/Users/Nican/Documents/GitHub/dart_web_toolkit
+  json_object: any 

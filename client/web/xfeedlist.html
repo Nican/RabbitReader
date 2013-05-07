@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+
+
+<html>
+  <body>
+    <element name="x-channel-view" constructor="ChannelView" extends="div">
+      <template>
+        <template iterate="feed in feedItems">
+           <x-channel-view-item item="{{feed}}"></x-channel-view-item>
+        </template>
+
+      </template>
+      <script type="application/dart" src="xfeedlist.dart"></script>
+    </element>
+    
+    <element name="x-channel-view-item" constructor="ChannelViewItem" extends="div">
+      <template>
+<style scoped>
+
+</style>
+      <div class="entry">
+              <div class="entry-title" on-click="toggleContent()">
+                <div style="float: right; text-align: right;">{{item.getFormattedTime()}}</div>
+                <span class="entry-feedTitle">{{item.feedTitle}}</span>
+                <div class="entry-summary">{{item.title}}</div>
+              </div>
+              <div template instantiate="if isOpen">
+                {{content}}
+              </div>
+           </div>
+      </template>
+<script type="application/dart">
+import 'package:web_ui/web_ui.dart';
+import 'dart:html';
+import 'dart:json';
+import 'xfeedlist.dart';
+ 
+ class ChannelViewItem extends WebComponent {
+  @observable
+  FeedItemList item;
+  
+  @observable
+  bool isOpen = false;
+  
+  @observable
+  String content = null;
+  
+  ChannelViewItem();
+  
+  void toggleContent(){
+    isOpen = !isOpen;
+    
+    if( content == null ){
+      requestContent();
+    
+    }    
+  }
+  
+  void requestContent(){
+    HttpRequest.getString("http://localhost:8080/item?id=${item.id}").then((t){
+      Map parsed = parse(t);
+      this.content = parsed["Content"];
+    });
+  
+  }
+  
+}  
+        
+        </script>
+    </element> 
+    
+  </body>
+</html>

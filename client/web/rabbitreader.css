@@ -1,0 +1,90 @@
+body {
+  font-family: 'Open Sans', sans-serif;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 1.2em;
+  margin: 0px;
+}
+
+h1, p {
+  color: #333;
+}
+
+.scroll-tree
+{
+  padding: 0px;  
+}
+
+
+.scroll-tree-item
+{
+  cursor: pointer;
+}
+
+.scroll-tree-item:hover
+{
+  background-color: #F0F0F0;
+}
+
+
+.entry-feedTitle {
+  color: #555; 
+  padding: 0 1em 0 0; 
+  overflow: hidden; 
+  display: block; 
+  width: 11em; 
+  white-space: nowrap;
+  position: absolute;
+  left: 1.85em;  
+}
+
+.entry-title {
+  padding: 0px; 
+  margin: 0px; 
+  border-bottom: solid 1px #ccc; 
+  overflow: hidden;
+  line-height: 27px;
+  font-size: 13px;
+  height: 27px;
+  background-color: rgb(238, 238, 238);
+  cursor: pointer;
+}
+
+.entry-summary {
+  margin: 0 9em 0 15em;
+  left: 0px;
+  padding: 0 0 0 1px;
+  color: #777;
+  white-space: normal;
+  width: auto;
+  overflow: hidden;
+  position: absolute;
+}
+.entry-time {
+  float: right; 
+  text-align: right;  
+}
+
+.feed-content {
+  margin: 10px;
+}
+
+
+.feed-content-title {
+    color: #15c;
+    text-decoration: none;
+    font-size: 140%;
+    margin: 0px;  
+    font-weight: bold;
+    font-size: 18px; 
+}
+
+.feed-content-body {
+    padding-top: 7px;
+}
+
+
+.entry {
+  
+
+}
