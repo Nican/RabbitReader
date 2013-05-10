@@ -162,5 +162,6 @@ pip-log.txt
 # Mac crap
 .DS_Store
 
-client/packages/*
-client/web/packages/*
+packages/*
+web/packages/*
+pubspec.lock
