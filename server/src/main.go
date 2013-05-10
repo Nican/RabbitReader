@@ -2,6 +2,7 @@ package main
 
 import "fmt"
 import "rreader"
+import "os"
 
 type User struct {
 	id   uint32
@@ -34,10 +35,18 @@ func importData() {
 func main() {
 	fmt.Printf("Starting Greader\n")
 	rreader.OpenDB()
-
-	//importData()
-	rreader.StartWebserver()
-	//rreader.UpdateFeeds()
+	
+	if os.Args[1] == "import" {
+		importData()
+	}
+	
+	if os.Args[1] == "update" {
+		rreader.UpdateFeeds(0)
+	}
+	
+	if os.Args[1] == "web" {
+		rreader.StartWebserver()
+	}
 
 	fmt.Printf("Finished Greader")
 }

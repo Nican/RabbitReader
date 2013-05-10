@@ -138,7 +138,7 @@ func readShared( reader GReader, f *zip.File ) {
 
 
 func ImportGReader(reader GReader, filePath string ) {
-	r, err := zip.OpenReader("nican132@gmail.com-takeout.zip")
+	r, err := zip.OpenReader(filePath)
 	
 	if err != nil {
 	    panic( err )

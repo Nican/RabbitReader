@@ -6,3 +6,4 @@ dependencies:
   dart_web_toolkit: 
     path: C:/Users/Nican/Documents/GitHub/dart_web_toolkit
   json_object: any 
+  intl: any

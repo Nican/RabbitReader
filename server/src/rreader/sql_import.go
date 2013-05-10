@@ -2,6 +2,7 @@ package rreader
 
 import (
 	_ "database/sql"
+	"github.com/ziutek/mymysql/thrsafe"
 	"github.com/ziutek/mymysql/mysql"
 	_ "github.com/ziutek/mymysql/native" // Native engine
 	"strings"
@@ -14,6 +15,7 @@ type SQLImporter struct {
 	transaction mysql.Transaction
 	feedIds map[string]uint32
 	groupIds map[string]uint32
+	entryIds []string
 }
 
 var gConn mysql.Conn
@@ -23,7 +25,7 @@ func GetConnection() mysql.Conn {
 }
 
 func OpenDB() {
-	gConn = mysql.New("tcp", "", "192.168.1.6:3306", "root", "password", "nican")
+	gConn = thrsafe.New("tcp", "", "192.168.1.6:3306", "root", "password", "nican")
 	
 	err := gConn.Connect()
 	if err != nil {
@@ -125,6 +127,13 @@ func (self SQLImporter) ReadFeedItem(item FeedItem) {
 		//panic( errors.New("Unkown type of feed '" + item.Origin.StreamId + "'!") )
 	}
 	
+	//Check if we already added the item.
+	for _, id := range self.entryIds {
+		if id == item.Id {
+			return
+		}
+	}
+	
 	feedUrl := item.Origin.StreamId[5:]
 
 	//Look for the feed id
@@ -162,21 +171,27 @@ func (self SQLImporter) ReadFeedItem(item FeedItem) {
 		self.feedIds[feedUrl] = feedId
 	}
 	
-	_, _, err := self.transaction.Query("INSERT IGNORE INTO `feed_entry`(`feed_id`,`title`,`content`,`comments`,`link`,`published`,`updated`,`author`,`guid`) VALUES (%d,'%s','%s','%s','%s','%s','%s','%s','%s')",
+	content := item.Summary.Content
+	
+	if len(item.Content.Content) > len(content) {
+		content = item.Content.Content
+	}
+	
+	_, _, err := self.transaction.Query("INSERT IGNORE INTO `feed_entry`(`feed_id`,`title`,`content`,`link`,`published`,`updated`,`author`,`guid`) VALUES (%d,'%s','%s','%s','%s','%s','%s','%s')",
 		feedId,
 		gConn.Escape(item.Title),
-		gConn.Escape(item.Summary.Content),
-		gConn.Escape(item.Content.Content),
+		gConn.Escape(content),
 		gConn.Escape( item.Alternate[0].Href ),
 		time.Unix( int64(item.Published), 0 ),
 		time.Unix( int64(item.Updated), 0 ),
 		gConn.Escape( item.Author ),
-		gConn.Escape(item.Id))
+		gConn.Escape( item.Id ) )
 
 	if err != nil {
 		panic(err)
 	}
 	
+	self.entryIds = append(self.entryIds, item.Id )
 }
 
 func (self SQLImporter) ReadFeedItems(items []FeedItem) {
@@ -201,7 +216,7 @@ func (self SQLImporter) OnShared(feed *FeedItems) {
 }
 
 func SQLImport(userId uint32, file string) (retErr error ){
-	importer := SQLImporter{userId, nil, make(map[string]uint32), make(map[string]uint32)}
+	importer := SQLImporter{userId, nil, make(map[string]uint32), make(map[string]uint32), make([]string, 0)}
 	var err error
 	
 	importer.transaction, err = gConn.Begin()
@@ -217,7 +232,7 @@ func SQLImport(userId uint32, file string) (retErr error ){
         }
     }()
 
-	ImportGReader(importer, "nican132@gmail.com-takeout.zip")
+	ImportGReader(importer, file)
 	
 	importer.transaction.Commit()
 

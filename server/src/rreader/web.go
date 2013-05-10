@@ -21,6 +21,7 @@ type FeedViewItem struct {
 	Description string
 	LastUpdate int64
 	Group string
+	Unread int
 }
 
 type ChannelView struct {
@@ -30,17 +31,19 @@ type ChannelView struct {
 type ChannelViewItem struct {
 	Id int
 	Title string
-	Published int64
+	Published string
+	Updated int64
 	Link string
 	Author string
 	FeedTitle string
 	FeedId int
+	IsRead int
 }
   
 func serveHome(w http.ResponseWriter, r *http.Request) { 
 
 	var userId uint32 = 1
-	rows, _, err := GetConnection().Query("SELECT `id`,`title`,`link`,`description`,`last_update`,`user_id`,`group` FROM home_view WHERE user_id=%d", userId)
+	rows, _, err := GetConnection().Query("SELECT `id`,`title`,`link`,`description`,`last_update`,`user_id`,`group`,`unread` FROM home_view WHERE user_id=%d", userId)
 	
 	if err != nil {
 		panic(err)
@@ -49,7 +52,7 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 	feeds := make([]FeedViewItem, len(rows) )
 	
 	for id, row := range rows {
-		feeds[id] = FeedViewItem{row.Int(0),row.Str(1),row.Str(2),row.Str(3), row.Time(4, time.Local).Unix(), row.Str(6) }
+		feeds[id] = FeedViewItem{row.Int(0),row.Str(1),row.Str(2),row.Str(3), row.Time(4, time.Local).Unix(), row.Str(6), row.Int(7) }
 	}
 	
 	b, err := json.Marshal(HomeView{feeds})
@@ -58,7 +61,7 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 	
-	fmt.Fprintf(w, string(b) )
+	fmt.Fprint(w, string(b) )
 	//c.Format = goweb.JSON_FORMAT
 	//c.RespondWithData(HomeView{feeds})
 }
@@ -87,7 +90,7 @@ func serveFeedItems(w http.ResponseWriter, r *http.Request) {
 		searchQuery = fmt.Sprintf("%s AND `feedid`=%d", searchQuery, feedId )
 	}
 	
-	rows, _, err := GetConnection().Query("SELECT `id`,`title`,`published`,`link`,`author`,`feedtitle`,`feedid` FROM `entrylist` WHERE %s ORDER BY `published` DESC LIMIT %d,100", searchQuery, start)
+	rows, _, err := GetConnection().Query("SELECT `id`,`title`,`published`,`updated`,`link`,`author`,`feedtitle`,`feedid`,`is_read` FROM `entrylist` WHERE %s ORDER BY `updated` DESC LIMIT %d,100", searchQuery, start)
 	
 	if err != nil {
 		panic(err)
@@ -96,8 +99,8 @@ func serveFeedItems(w http.ResponseWriter, r *http.Request) {
 	feeds := make([]ChannelViewItem, len(rows) )
 	
 	for id, row := range rows {
-		published := row.Time(2, time.Local).Unix()
-		feeds[id] = ChannelViewItem{row.Int(0),row.Str(1),published,row.Str(3),row.Str(4),row.Str(5),row.Int(6)}
+		updated := row.Time(3, time.Local).Unix()
+		feeds[id] = ChannelViewItem{row.Int(0),row.Str(1),row.Str(2),updated,row.Str(4),row.Str(5),row.Str(6),row.Int(7), row.Int(8)}
 	}
 	
 	b, err := json.Marshal(ChannelView{feeds})
@@ -106,7 +109,7 @@ func serveFeedItems(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 	
-	fmt.Fprintf(w, string(b) )
+	fmt.Fprint(w, string(b) )
 	
 	//c.Format = goweb.JSON_FORMAT
 	//c.RespondWithData(ChannelView{feeds})
@@ -117,8 +120,7 @@ type FeedEntryModel struct {
 	FeedId int
 	Title string
 	Content string
-	Comments string
-	Published int64
+	Published string
 	Updated int64
 	Author string
 	Link string
@@ -126,21 +128,28 @@ type FeedEntryModel struct {
 
 func serveGetItem(w http.ResponseWriter, r *http.Request) { 
 	id, err := strconv.ParseInt( r.FormValue("id"), 10, 64 )
+	userId := 1
 	
 	if err != nil {
 		panic(err)
 	}
 	
-	row, _, err := GetConnection().QueryFirst("SELECT `id`,`feed_id`,`title`,`content`,`comments`,`published`,`updated`,`author`,`link` FROM `feed_entry` WHERE id=%d", id)
+	rows, _, err := GetConnection().Query("SELECT `id`,`feed_id`,`title`,`content`,`published`,`updated`,`author`,`link` FROM `feed_entry` WHERE id=%d", id)
 	
 	if err != nil {
 		panic(err)
 	}
 	
-	published := row.Time(5, time.Local).Unix()
-	update := row.Time(6, time.Local).Unix() 
+	if len(rows) == 0 {
+		fmt.Fprint(w, "{\"error\": \"Could not find entry\"}" )
+		return
+	}
+	
+	row := rows[0]
+	feedId := row.Int(1)
+	update := row.Time(5, time.Local).Unix() 
 
-	model := FeedEntryModel{row.Int(0),row.Int(1),row.Str(2),row.Str(3),row.Str(4), published, update, row.Str(7),row.Str(8)}
+	model := FeedEntryModel{row.Int(0),feedId,row.Str(2),row.Str(3), row.Str(4), update, row.Str(6),row.Str(7)}
 	
 	b, err := json.Marshal(model)
 	
@@ -148,10 +157,20 @@ func serveGetItem(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 	
-	fmt.Fprintf(w, string(b) )
+	//TODO:The update and replace statments should be in a transaction 
+	_, _, err = GetConnection().QueryFirst("REPLACE INTO `user_feed_readitems`(user_id,feed_id,entry_id) VALUES (%d,%d,%d)", userId, feedId, id )
 	
-	//c.Format = goweb.JSON_FORMAT
-	//c.RespondWithData(model)
+	if err != nil {
+		panic(err)
+	}
+	
+	_, _, err = GetConnection().QueryFirst("UPDATE user_feed SET unread_items=GREATEST(unread_items-1,0) WHERE user_id=%d AND feed_id=%d", userId, feedId )
+	
+	if err != nil {
+		panic(err)
+	}
+	
+	fmt.Fprint(w, string(b) )
 }
 
 func updatePriorities( transaction mysql.Transaction, userId int, newPriorities map[string]GroupInfo ) error {
@@ -220,7 +239,7 @@ func StartWebserver() {
 	http.HandleFunc("/feed", serveFeedItems)
 	http.HandleFunc("/item", serveGetItem)
 	http.HandleFunc("/updateOrder", serveUpdateOrder)
-	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("C:/Users/Nican/dart/RabbitReader/web"))))
+	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("C:/Users/Nican/Documents/GitHub/RabbitReader/client/web"))))
 	
 	//goweb.MapFunc("/home", serveHome)
 	//goweb.MapFunc("/feed/{page}", serveFeedItems )

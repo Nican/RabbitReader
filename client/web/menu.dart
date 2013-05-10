@@ -1,10 +1,40 @@
 part of RabbitReader;
 
-class SortableTreeItemWidget extends ui.TreeItem  {
+class TreeLabel extends ui.FlowPanel implements event.HasClickHandlers {
+  
+  ui.Label titleLabel = new ui.Label();
+  ui.Label unreadLabel = new ui.Label();
+  
+  TreeLabel(){
+    titleLabel.setStylePrimaryName("scroll-tree-item-title");
+    unreadLabel.setStylePrimaryName("scroll-tree-item-unread");
+    
+    unreadLabel.text = "(3)";
+    
+    add(titleLabel);
+    add(unreadLabel);
+  }
+  
+  void set text(String val) {
+    titleLabel.text = val;
+  }
+  
+  void set unread(int val) {
+    unreadLabel.visible = val > 0;
+    unreadLabel.text = "(" + val.toString() + ")";
+  }
+  
+  event.HandlerRegistration addClickHandler(event.ClickHandler handler) {
+    return addDomHandler(handler, event.ClickEvent.TYPE);
+  }
+}
+
+abstract class SortableTreeItemWidget extends ui.TreeItem  {
   
   static SortableTreeItemWidget startDrag; 
   static Element lastDragged = null;
-  ui.Label label = new ui.Label("");
+  
+  TreeLabel label = new TreeLabel();
   
   SortableTreeItemWidget(){
     setWidget(label);
@@ -22,7 +52,16 @@ class SortableTreeItemWidget extends ui.TreeItem  {
     
     getElement().onDrop.listen(this.onDrop);
     
+    label.addClickHandler(this);
+    updateTitle();
+  }
+  
+  void updateTitle(){
+    label.text = getTitle(); 
+    label.unread = getUnreadItems();
     
+    ui.TreeItem parent = this.getParentItem();
+    if( parent is SortableTreeItemWidget ){ parent.updateTitle(); }
   }
   
   void dragStart(MouseEvent event){
@@ -106,69 +145,108 @@ class SortableTreeItemWidget extends ui.TreeItem  {
     elem.style.borderBottom = "";
   }
   
+  void onClick(event.ClickEvent event){
+    reader.setFeedProdiver(getProvider());
+  }
+  
+  FeedProvier getProvider();
+  int getUnreadItems();
+  String getTitle();
+  
 }
 
 class FeedTreeItemWidget extends SortableTreeItemWidget implements event.ClickHandler  {
   Feed feed;
+  StreamSubscription onUpdateSubscription;
   
   FeedTreeItemWidget(this.feed){
-    label.text = feed.title;
-    
-    label.addClickHandler(this);
+    feed.onUpdate.listen((Feed feed){ this.updateTitle(); });
   }
   
-  void onClick(event.ClickEvent event){
-    reader.setFeedProdiver(new FeedProvier.byFeed(feed));
+  /*
+  void onLoad(){
+    onUpdateSubscription = feed.onUpdate.listen(this.updateTitle);
+    print("Listening to feed updates");
   }
+  
+  void onUnload(){
+    onUpdateSubscription.cancel();
+    print("Cancel feed updates");
+  }
+  */
+  
+  FeedProvier getProvider(){
+    return new FeedProvier.byFeed(feed);
+  }
+  
+  int getUnreadItems(){
+    return feed.unreadItems;
+  }
+  
+  String getTitle(){
+    return feed.title;
+  }
+
 }
 
 class FeedTreeGroupWidget extends SortableTreeItemWidget implements event.ClickHandler {
   String group;
   
   FeedTreeGroupWidget(this.group) {
-    label.text = group;
-    
-    label.addClickHandler(this);
   }
   
-  void onClick(event.ClickEvent event){
-    reader.setFeedProdiver(new FeedProvier.byGroup(group));
+  FeedProvier getProvider(){
+    return new FeedProvier.byGroup(group);
+  }
+  
+  int getUnreadItems(){
+    if( getChildren() == null )
+      return 0;
+    
+    return this.getChildren().fold(0, (val, SortableTreeItemWidget child){
+      return val + child.getUnreadItems();
+    });
+  }
+  
+  void addItem(ui.TreeItem item) {
+    super.addItem(item);
+    updateTitle();
+  }
+  
+  String getTitle(){
+    return group;
   }
 }
 
 
 class FeedTreeWidget extends ui.Tree {
   
-  List<Feed> feeds;
+  Map<String, ui.TreeItem> groups = new Map();
   
-  FeedTreeWidget(this.feeds){
+  FeedTreeWidget(){
+    reader.onFeedAdded.listen(this.onFeedAdded);
+  }
+  
+  void onFeedAdded(Feed feed){
+    FeedTreeItemWidget widget = new FeedTreeItemWidget(feed);
     
-    Map<String, ui.TreeItem> groups = new Map();
+    String group = widget.feed.group;
     
-    List<FeedTreeItemWidget> items = feeds.map((Feed feed){
-      return new FeedTreeItemWidget(feed);
-    }).toList();
+    if(group == ""){
+      addItem(widget);
+      return;
+    }
     
-    items.forEach((FeedTreeItemWidget item){
-      String group = item.feed.group;
-      
-      if(group == ""){
-        addItem(item);
-        return;
-      }
-      
-      if( groups.containsKey(group) ){
-        groups[group].addItem(item);
-        return;
-      }
-      
-      FeedTreeGroupWidget leaf = new FeedTreeGroupWidget(group);
-      leaf.addItem(item);
-      addItem(leaf);
-      
-      groups[group] = leaf; 
-    });
+    if( groups.containsKey(group) ){
+      groups[group].addItem(widget);
+      return;
+    }
     
+    FeedTreeGroupWidget leaf = new FeedTreeGroupWidget(group);
+    leaf.addItem(widget);
+    addItem(leaf);
+    
+    groups[group] = leaf; 
   }
   
   void updateOrder(){

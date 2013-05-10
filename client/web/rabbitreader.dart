@@ -12,11 +12,24 @@ part 'feedlist.dart';
 RabbitReader reader = new RabbitReader();
 
 class RabbitReader {
+  StreamController<Feed> onFeedAddedController = new StreamController<Feed>();
+  Stream<Feed> get onFeedAdded => onFeedAddedController.stream;
+  
   List<Feed> feeds = new List<Feed>();
+  
   FeedEntryListWidget entries = new FeedEntryListWidget();
   
   void setFeedProdiver(FeedProvier provider){
     entries.setFeedProdiver(provider);
+  }
+  
+  void addFeed(Feed feed){
+    this.feeds.add(feed);
+    onFeedAddedController.add(feed);
+  }
+  
+  Feed getFeedById(int id){
+    return feeds.firstWhere((Feed feed){ return feed.id == id; }, orElse: (){ return null;} );
   }
 }
 
@@ -29,27 +42,35 @@ class Feed {
   String description;
   int lastUpdate;
   String group;
+  int unreadItems;
   
-  Feed(this.id, this.title, this.link, this.description, this.lastUpdate, this.group);
+  StreamController<Feed> onUpdateController = new StreamController<Feed>();
+  Stream<Feed> get onUpdate => onUpdateController.stream;
+  
+  Feed(this.id, this.title, this.link, this.description, this.lastUpdate, this.group, this.unreadItems);
+  
+  void fireUpdate(){
+    onUpdateController.add(this);
+  }
   
 }
 
 void main() {
+  FeedTreeWidget feedTree = new FeedTreeWidget();  
+  ui.RootPanel.get("feedList").add(feedTree);
+  ui.RootPanel.get("entryBody").add(reader.entries);
+  
+  
 
   HttpRequest.getString("http://localhost:8080/home").then((t){
     Map parsed = parse(t);
     
     List<Feed> newFeeds = parsed["Feeds"].map((Map feed){
-      return new Feed( feed["Id"], feed["Title"], feed["Link"], feed["Description"], feed["LastUpdate"], feed["Group"] );
+      return new Feed( feed["Id"], feed["Title"], feed["Link"], feed["Description"], feed["LastUpdate"], feed["Group"], feed["Unread"] );
     } ).toList();
     
-    reader.feeds.addAll(newFeeds);
-    
-    FeedTreeWidget widget = new FeedTreeWidget( newFeeds );
+    newFeeds.forEach(reader.addFeed);
     reader.setFeedProdiver(new FeedProvier());
-    
-    ui.RootPanel.get("feedList").add(widget);
-    ui.RootPanel.get("entryBody").add(reader.entries);
   });
   
 }

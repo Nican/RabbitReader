@@ -1,17 +1,23 @@
 part of RabbitReader;
 
+
 class FeedItemList {
   int id;
   String title;
   DateTime published;
   String link;
   String author;
-  String feedTitle;   
+  Feed feed;
+  bool isRead;
   
-  FeedItemList(this.id, this.title, this.published, this.link, this.author, this.feedTitle);
+  StreamController<FeedItemList> onUpdateController = new StreamController<FeedItemList>();
+  Stream<FeedItemList> get onUpdate => onUpdateController.stream;
+  
+  FeedItemList(this.id, this.title, this.published, this.link, this.author, this.feed, this.isRead );
   
   String getFormattedTime(){
     DateTime today = new DateTime.now();
+    
     
     if( today.day == published.day && today.month == published.month && today.year == published.year){
       return "${published.hour}:${published.minute}";
@@ -19,7 +25,57 @@ class FeedItemList {
     
     return "${published.month}/${published.day}/${published.year}";
   }
+  
+  void markAsRead(){
+    if(isRead)
+      return;
+    
+    isRead = true;
+    onUpdateController.add(this);
+    
+    feed.unreadItems -= 1;
+    feed.fireUpdate();
+  }
+  
+  Future<FeedEntryModel> getEntry(){
+    Completer<FeedEntryModel> completer = new Completer();
+    
+    HttpRequest.getString("http://localhost:8080/item?id=${id}").then((t){
+      Map parsed = parse(t);
+      
+      DateTime updated = new DateTime.fromMillisecondsSinceEpoch( parsed["Updated"] * 1000 );
+      
+      FeedEntryModel model = new FeedEntryModel(
+          parsed["Id"],
+          parsed["FeedId"],
+          parsed["Title"],
+          parsed["Content"],
+          parsed["Published"],
+          updated,
+          parsed["Author"],
+          parsed["Link"]      
+      );
+      
+      completer.complete(model);
+    });
+    
+    return completer.future;
+  }
 }
+
+class FeedEntryModel {
+  int id;
+  int feedId;
+  String title;
+  String content;
+  String published;
+  DateTime updated;
+  String author;
+  String link;
+  
+  FeedEntryModel(this.id,this.feedId,this.title,this.content,this.published,this.updated,this.author,this.link);
+}
+
 
 class FeedProvier {
   
@@ -46,10 +102,11 @@ class FeedProvier {
     HttpRequest.getString(href).then((t){
       Map parsed = parse(t);
       
-      List<FeedItemList> newFeeds = parsed["Items"].map((Map feed){
-        DateTime time = new DateTime.fromMillisecondsSinceEpoch( feed["Published"] * 1000 );
+      List<FeedItemList> newFeeds = parsed["Items"].map((Map feedItem){
+        DateTime time = new DateTime.fromMillisecondsSinceEpoch( feedItem["Updated"] * 1000 );
+        Feed feed = reader.getFeedById(feedItem["FeedId"]);        
         
-        return new FeedItemList( feed["Id"], feed["Title"], time, feed["Link"], feed["Author"], feed["FeedTitle"] );
+        return new FeedItemList( feedItem["Id"], feedItem["Title"], time, feedItem["Link"], feedItem["Author"], feed, feedItem["IsRead"] > 0 );
       } ).toList();
       
       completer.complete( newFeeds );
@@ -101,9 +158,9 @@ class FeedEntryListWidgetEntry extends ui.FlowPanel{
   ui.SimplePanel content = null;
   
   bool isOpen = false;
+  Element title = new DivElement();
   
   FeedEntryListWidgetEntry(this.item){
-    Element title = new DivElement();
     title.classes.add("entry-title");
     
     getElement().append(title);
@@ -111,19 +168,22 @@ class FeedEntryListWidgetEntry extends ui.FlowPanel{
     titleLabel.setStylePrimaryName("entry-feedTitle");
     summaryLabel.setStylePrimaryName("entry-summary");
     timeLabel.setStylePrimaryName("entry-time" ); 
-    
-    titleLabel.text = item.feedTitle;
-    summaryLabel.text = item.title;
-    timeLabel.text = item.getFormattedTime();
-
     addWidget(titleLabel, title);
     addWidget(timeLabel, title);
     addWidget(summaryLabel, title);
     
     title.onClick.listen(this.toggleContent);
+    
+    update();
   }
   
-  
+  void update(){
+    titleLabel.text = item.feed.title;
+    summaryLabel.text = item.title;
+    timeLabel.text = item.getFormattedTime();
+    
+    title.style.backgroundColor = item.isRead ? "#EEE" : "#FFF";
+  }
   
   void toggleContent(event){
     isOpen = !isOpen;
@@ -155,49 +215,18 @@ class FeedEntryListWidgetEntry extends ui.FlowPanel{
   }
   
   void updateContent(){
-    HttpRequest.getString("http://localhost:8080/item?id=${item.id}").then((t){
-      Map parsed = parse(t);
-      
-      DateTime published = new DateTime.fromMillisecondsSinceEpoch( parsed["Published"] * 1000 );
-      DateTime updated = new DateTime.fromMillisecondsSinceEpoch( parsed["Updated"] * 1000 );
-      
-      FeedEntryModel model = new FeedEntryModel(
-          parsed["Id"],
-          parsed["FeedId"],
-          parsed["Title"],
-          parsed["Content"],
-          parsed["Comments"],
-          published,
-          updated,
-          parsed["Author"],
-          parsed["Link"]      
-      );
-      
+    item.getEntry().then((FeedEntryModel model){
       var widget = new FeedItemContentWidget(model);
       content.remove(content.getWidget());
       content.add(widget);
       
       getElement().scrollIntoView();
-      //content.getElement().innerHtml = parsed["Content"] + parsed["Comments"];
+      item.markAsRead();
+      update();
     });
   }
   
 }
-
-class FeedEntryModel {
-  int id;
-  int feedId;
-  String title;
-  String content;
-  String comments;
-  DateTime published;
-  DateTime updated;
-  String author;
-  String link;
-  
-  FeedEntryModel(this.id,this.feedId,this.title,this.content,this.comments,this.published,this.updated,this.author,this.link);
-}
-
 
 class FeedItemContentWidget extends ui.FlowPanel {
   FeedEntryModel entry;
@@ -217,10 +246,10 @@ class FeedItemContentWidget extends ui.FlowPanel {
     title.href = entry.link;
     
     content.setStylePrimaryName("feed-content-body");
-    content.getElement().innerHtml =  entry.content + entry.comments;   
+    content.getElement().innerHtml =  entry.content;   
     
     content.getElement().queryAll("a").forEach((anchor){
-      anchor.target = "_blank";      
+      anchor.target = "_blank";
     });
     
     add(title);

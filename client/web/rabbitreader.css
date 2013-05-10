@@ -1,5 +1,6 @@
 body {
-  font-family: 'Open Sans', sans-serif;
+  /* font-family: 'Open Sans', sans-serif; */
+  font-family: arial, sans-serif;
   font-size: 14px;
   font-weight: normal;
   line-height: 1.2em;
@@ -11,14 +12,43 @@ h1, p {
 }
 
 .scroll-tree
-{
-  padding: 0px;  
+{ 
+  font-size: 13px;
 }
 
 
 .scroll-tree-item
 {
   cursor: pointer;
+}
+
+.scroll-tree-item-title
+{
+  max-width: 132px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  height: 21px;
+  font-size: 13px;
+  display: inline-block;
+  line-height: 21px;
+  margin: 0px 0px 0px 0px;
+  vertical-align: top;
+}
+
+.scroll-tree-item-unread
+{
+  white-space: nowrap;
+  height: 21px;
+  font-size: 11px;
+  width: 26px;
+  margin: 0px 1px 0px 0px;
+  padding: 0px 0px 0px 1px;
+  text-align: left;
+  display: inline-block;
+  color: rgb(102,102,102);
+  vertical-align: top;
+  line-height: 21px;
 }
 
 .scroll-tree-item:hover
