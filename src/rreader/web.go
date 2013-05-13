@@ -40,13 +40,30 @@ type ChannelViewItem struct {
 	IsRead    int
 }
 
+type errorResponse struct {
+	errStr string
+}
+
+func respondError( w http.ResponseWriter, errStr string ){
+	w.WriteHeader( 500 ) //Internal server error
+	
+	b, err := json.Marshal(errorResponse{errStr})
+
+	if err != nil {
+		panic(err)
+	}
+	
+	fmt.Fprint(w, b)
+} 
+
 func serveHome(w http.ResponseWriter, r *http.Request) {
 
 	var userId uint32 = 1
 	rows, _, err := GetConnection().Query("SELECT `id`,`title`,`link`,`description`,`last_update`,`user_id`,`group`,`unread` FROM home_view WHERE user_id=%d", userId)
 
 	if err != nil {
-		panic(err)
+		respondError( w, err.Error() ) 
+		return
 	}
 
 	feeds := make([]FeedViewItem, len(rows))
@@ -58,7 +75,8 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 	b, err := json.Marshal(HomeView{feeds})
 
 	if err != nil {
-		panic(err)
+		respondError( w, err.Error() ) 
+		return
 	}
 
 	fmt.Fprint(w, string(b))
@@ -84,7 +102,8 @@ func serveFeedItems(w http.ResponseWriter, r *http.Request) {
 		feedId, err := strconv.ParseInt(feed, 10, 64)
 
 		if err != nil {
-			panic(err)
+			respondError( w, err.Error() ) 
+			return
 		}
 
 		searchQuery = fmt.Sprintf("%s AND `feedid`=%d", searchQuery, feedId)
@@ -93,7 +112,8 @@ func serveFeedItems(w http.ResponseWriter, r *http.Request) {
 	rows, _, err := GetConnection().Query("SELECT `id`,`title`,`published`,`updated`,`link`,`author`,`feedtitle`,`feedid`,`is_read` FROM `entrylist` WHERE %s ORDER BY `updated` DESC LIMIT %d,100", searchQuery, start)
 
 	if err != nil {
-		panic(err)
+		respondError( w, err.Error() ) 
+		return
 	}
 
 	feeds := make([]ChannelViewItem, len(rows))
@@ -106,7 +126,8 @@ func serveFeedItems(w http.ResponseWriter, r *http.Request) {
 	b, err := json.Marshal(ChannelView{feeds})
 
 	if err != nil {
-		panic(err)
+		respondError( w, err.Error() ) 
+		return
 	}
 
 	fmt.Fprint(w, string(b))
@@ -116,14 +137,7 @@ func serveFeedItems(w http.ResponseWriter, r *http.Request) {
 }
 
 type FeedEntryModel struct {
-	Id        int
-	FeedId    int
-	Title     string
-	Content   string
-	Published string
-	Updated   int64
-	Author    string
-	Link      string
+	content string
 }
 
 func serveGetItem(w http.ResponseWriter, r *http.Request) {
@@ -134,10 +148,11 @@ func serveGetItem(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	rows, _, err := GetConnection().Query("SELECT `id`,`feed_id`,`title`,`content`,`published`,`updated`,`author`,`link` FROM `feed_entry` WHERE id=%d", id)
+	rows, _, err := GetConnection().Query("SELECT `content` FROM `feed_entry` WHERE id=%d", id)
 
 	if err != nil {
-		panic(err)
+		respondError( w, err.Error() ) 
+		return
 	}
 
 	if len(rows) == 0 {
@@ -146,28 +161,34 @@ func serveGetItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	row := rows[0]
-	feedId := row.Int(1)
-	update := row.Time(5, time.Local).Unix()
-
-	model := FeedEntryModel{row.Int(0), feedId, row.Str(2), row.Str(3), row.Str(4), update, row.Str(6), row.Str(7)}
-
-	b, err := json.Marshal(model)
+	b, err := json.Marshal(FeedEntryModel{row.Str(0)})
 
 	if err != nil {
-		panic(err)
+		respondError( w, err.Error() ) 
+		return
 	}
 
 	//TODO:The update and replace statments should be in a transaction 
-	_, _, err = GetConnection().QueryFirst("REPLACE INTO `user_feed_readitems`(user_id,feed_id,entry_id) VALUES (%d,%d,%d)", userId, feedId, id)
+	//TODO: Only insert into user_feed_readitems when the items is newer than the user_feeds.newest_read  
+	_, _, err = GetConnection().QueryFirst("REPLACE INTO `user_feed_readitems`(user_id,entry_id) VALUES (%d,%d)", userId, id)
 
 	if err != nil {
-		panic(err)
+		respondError( w, err.Error() ) 
+		return
 	}
-
+	/*
 	_, _, err = GetConnection().QueryFirst("UPDATE user_feed SET unread_items=GREATEST(unread_items-1,0) WHERE user_id=%d AND feed_id=%d", userId, feedId)
 
 	if err != nil {
 		panic(err)
+	}
+	*/
+	//TODO: Extremelly inneficient; Make better method
+	_, _, err = GetConnection().QueryFirst("CALL update_unread()")
+
+	if err != nil {
+		respondError( w, err.Error() ) 
+		return
 	}
 
 	fmt.Fprint(w, string(b))
@@ -214,19 +235,22 @@ func serveUpdateOrder(w http.ResponseWriter, r *http.Request) {
 
 	err := decoder.Decode(&newPriorities)
 	if err != nil {
-		panic(err)
+		respondError( w, err.Error() ) 
+		return
 	}
 
 	transaction, err := gConn.Begin()
 	if err != nil {
-		panic(err)
+		respondError( w, err.Error() ) 
+		return
 	}
 
 	err = updatePriorities(transaction, userId, newPriorities)
 
 	if err != nil {
 		transaction.Rollback()
-		panic(err)
+		respondError( w, err.Error() ) 
+		return
 	}
 
 	transaction.Commit()
@@ -240,13 +264,5 @@ func StartWebserver() {
 	http.HandleFunc("/updateOrder", serveUpdateOrder)
 	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("web"))))
 
-	//goweb.MapFunc("/home", serveHome)
-	//goweb.MapFunc("/feed/{page}", serveFeedItems )
-	//goweb.MapFunc("/item/{id}", serveGetItem )
-	//goweb.MapStatic("*", "C:/Users/Nican/dart/RabbitReader/web/out")
-
 	http.ListenAndServe(":8080", nil)
-	//goweb.ConfigureDefaultFormatters()
-	//goweb.ListenAndServe(":8080")
-
 }

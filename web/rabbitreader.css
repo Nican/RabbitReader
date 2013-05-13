@@ -90,6 +90,17 @@ h1, p {
   overflow: hidden;
   position: absolute;
 }
+
+.entry-star {
+  display: block; 
+  position: absolute;
+  overflow: hidden; 
+  font-size: 13px;
+  height: 27px;
+  line-height: 27px;
+}
+
+
 .entry-time {
   float: right; 
   text-align: right;  

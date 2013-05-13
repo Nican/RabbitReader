@@ -33,7 +33,53 @@ class RabbitReader {
   }
 }
 
-
+class FeedProvier {
+  
+  int itemsPerPage = 100;
+  String query;
+  
+  FeedProvier(){
+    query = "";
+  }
+  
+  FeedProvier.byGroup( String group ){
+    query = "group=${group}";
+  }
+  
+  FeedProvier.byFeed( Feed feed ){
+    query = "feed=${feed.id}";
+  }
+  
+  
+  Future<List<FeedItemList>> getPage({ int page: 0 }){
+    Completer<List<FeedItemList>> completer = new Completer();
+    String href = "http://localhost:8080/feed?${query}&start=${page * itemsPerPage}";
+    
+    HttpRequest.getString(href).then((t){
+      Map parsed = parse(t);
+      
+      List<FeedItemList> newFeeds = parsed["Items"].map((Map feedItem){
+        DateTime time = new DateTime.fromMillisecondsSinceEpoch( feedItem["Updated"] * 1000 );
+        Feed feed = reader.getFeedById(feedItem["FeedId"]);        
+        
+        return new FeedItemList( 
+            feedItem["Id"], 
+            feedItem["Title"], 
+            time, 
+            feedItem["Link"], 
+            feedItem["Author"], 
+            feed, 
+            feedItem["IsRead"] > 0 );
+        
+      } ).toList();
+      
+      completer.complete( newFeeds );
+    });
+   
+    return completer.future;
+  }
+  
+}
 
 class Feed {
   int id;
@@ -53,6 +99,59 @@ class Feed {
     onUpdateController.add(this);
   }
   
+}
+
+class FeedItemList {
+  int id;
+  String title;
+  DateTime published;
+  String link;
+  String author;
+  Feed feed;
+  bool isRead;
+  
+  String content;
+  
+  StreamController<FeedItemList> onUpdateController = new StreamController<FeedItemList>();
+  Stream<FeedItemList> get onUpdate => onUpdateController.stream;
+  
+  FeedItemList(this.id, this.title, this.published, this.link, this.author, this.feed, this.isRead );
+  
+  String getFormattedTime(){
+    DateTime today = new DateTime.now();
+    
+    
+    if( today.day == published.day && today.month == published.month && today.year == published.year){
+      return "${published.hour}:${published.minute}";
+    }
+    
+    return "${published.month}/${published.day}/${published.year}";
+  }
+  
+  void markAsRead(){
+    if(isRead)
+      return;
+    
+    isRead = true;
+    onUpdateController.add(this);
+    
+    feed.unreadItems -= 1;
+    feed.fireUpdate();
+  }
+  
+  Future<String> getContent(){
+    Completer<String> completer = new Completer();
+    
+    HttpRequest.getString("http://localhost:8080/item?id=${id}").then((t){
+      Map parsed = parse(t);
+      
+      this.content = parsed["Content"];
+      
+      completer.complete(this.content);
+    });
+    
+    return completer.future;
+  }
 }
 
 void main() {
