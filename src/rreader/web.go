@@ -131,7 +131,7 @@ func serveFeedItems(w http.ResponseWriter, r *http.Request) {
 }
 
 type FeedEntryModel struct {
-	content string
+	Content string
 }
 
 func serveGetItem(w http.ResponseWriter, r *http.Request) {
@@ -212,10 +212,10 @@ func serveUpdateItemLabels(w http.ResponseWriter, r *http.Request) {
 		return fmt.Sprintf("INSERT IGNORE INTO `user_entry_label`(`user_id`,`feed_entry_id`,`label`) VALUES (%d,%d,'%s')", userId, entryId, labels )
 	}
 	
-	_, _, err = GetConnection().QueryFirst(getQuery())
+	_, _, err = GetConnection().Query(getQuery())
 
 	if err != nil {
-		respondError( w, err.Error() ) 
+		respondError( w, err.Error() )
 		return
 	}
 	
