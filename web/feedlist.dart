@@ -34,7 +34,7 @@ class FeedEntryListWidget extends ui.FlowPanel{
 class FeedEntryListWidgetEntry extends ui.FlowPanel{
   FeedItemList item;
   
-  ui.HtmlPanel starLabel = new ui.HtmlPanel("&#9733;");
+  ui.Label starLabel = new ui.Label("");
   ui.Label titleLabel = new ui.Label();
   ui.Label timeLabel = new ui.Label();
   ui.Label summaryLabel = new ui.Label();
@@ -60,6 +60,7 @@ class FeedEntryListWidgetEntry extends ui.FlowPanel{
     addWidget(summaryLabel, title);
     
     title.onClick.listen(this.toggleContent);
+    starLabel.getElement().onClick.listen(this.toggleStar);
     
     update();
   }
@@ -70,6 +71,21 @@ class FeedEntryListWidgetEntry extends ui.FlowPanel{
     timeLabel.text = item.getFormattedTime();
     
     title.style.backgroundColor = item.isRead ? "#EEE" : "#FFF";
+    
+    starLabel.getElement().innerHtml = item.labels.contains("star") ? "&#9733;" : "&#9734;";
+  }
+  
+  void toggleStar(MouseEvent event){
+    event.stopPropagation();
+    
+    if( item.labels.contains("star") ){
+      item.labels.remove("star");
+    } else {
+      item.labels.add("star");
+    }
+    
+    this.update();
+    item.updateLabels();
   }
   
   void toggleContent(event){

@@ -89,20 +89,13 @@ ENGINE = InnoDB;
 -- -----------------------------------------------------
 CREATE  TABLE IF NOT EXISTS `nican`.`user_feed_readitems` (
   `user_id` INT UNSIGNED NOT NULL ,
-  `feed_id` INT UNSIGNED NOT NULL ,
   `entry_id` INT UNSIGNED NOT NULL ,
-  PRIMARY KEY (`user_id`, `feed_id`, `entry_id`) ,
+  PRIMARY KEY (`user_id`, `entry_id`) ,
   INDEX `readitems_user_idx` (`user_id` ASC) ,
-  INDEX `readitems_feed_idx` (`feed_id` ASC) ,
   INDEX `readitems_feed_entry_idx` (`entry_id` ASC) ,
   CONSTRAINT `readitems_user`
     FOREIGN KEY (`user_id` )
     REFERENCES `nican`.`users` (`id` )
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
-  CONSTRAINT `readitems_feed`
-    FOREIGN KEY (`feed_id` )
-    REFERENCES `nican`.`feed` (`id` )
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `readitems_feed_entry`
@@ -112,12 +105,35 @@ CREATE  TABLE IF NOT EXISTS `nican`.`user_feed_readitems` (
     ON UPDATE NO ACTION)
 ENGINE = InnoDB;
 
+
+-- -----------------------------------------------------
+-- Table `nican`.`user_entry_label`
+-- -----------------------------------------------------
+CREATE  TABLE IF NOT EXISTS `nican`.`user_entry_label` (
+  `user_id` INT UNSIGNED NOT NULL ,
+  `feed_entry_id` INT UNSIGNED NOT NULL ,
+  `label` VARCHAR(45) NULL ,
+  PRIMARY KEY (`user_id`, `feed_entry_id`) ,
+  INDEX `user_feed_readitems-user_idx` (`user_id` ASC) ,
+  INDEX `user_feed_readitems-entry_idx` (`feed_entry_id` ASC) ,
+  CONSTRAINT `user_feed_readitems-user`
+    FOREIGN KEY (`user_id` )
+    REFERENCES `nican`.`users` (`id` )
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+  CONSTRAINT `user_feed_readitems-entry`
+    FOREIGN KEY (`feed_entry_id` )
+    REFERENCES `nican`.`feed_entry` (`id` )
+    ON DELETE CASCADE
+    ON UPDATE CASCADE)
+ENGINE = InnoDB;
+
 USE `nican` ;
 
 -- -----------------------------------------------------
 -- Placeholder table for view `nican`.`entrylist`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `nican`.`entrylist` (`id` INT, `title` INT, `published` INT, `updated` INT, `link` INT, `author` INT, `feedtitle` INT, `feedid` INT, `userid` INT, `group` INT, `is_read` INT);
+CREATE TABLE IF NOT EXISTS `nican`.`entrylist` (`id` INT, `title` INT, `published` INT, `updated` INT, `link` INT, `author` INT, `feedtitle` INT, `feedid` INT, `userid` INT, `group` INT, `is_read` INT, `label` INT);
 
 -- -----------------------------------------------------
 -- Placeholder table for view `nican`.`home_view`
@@ -151,16 +167,18 @@ DROP TABLE IF EXISTS `nican`.`entrylist`;
 USE `nican`;
 CREATE  OR REPLACE VIEW `nican`.`entrylist` AS
 SELECT entry.id, entry.title, entry.published, entry.updated, entry.link, entry.author, 
-feed.title as `feedtitle`, feed.id AS `feedid`, user_feed.user_id as `userid`,
-`user_feed`.`group`, 
-	(`user_feed_readitems`.`entry_id` IS NOT NULL or `user_feed`.`newest_read` > `entry`.`updated`) as `is_read`
+feed.title as `feedtitle`, feed.id AS `feedid`, user_feed.user_id as `userid`, `user_feed`.`group`, 
+	(`user_feed`.`newest_read` > `entry`.`updated` OR `user_feed_readitems`.`entry_id` IS NOT NULL) as `is_read`,
+	`user_entry_label`.`label` as `label`
 FROM `feed_entry` as `entry`
 JOIN `feed` ON `entry`.`feed_id` = `feed`.`id` 
 JOIN `user_feed` ON `feed`.`id` = user_feed.feed_id 
 LEFT JOIN `user_feed_readitems` ON 
-	`feed`.`id` = `user_feed_readitems`.`feed_id` AND 
 	`user_feed`.`user_id` = `user_feed_readitems`.`user_id` AND
-	`entry`.`id` = `user_feed_readitems`.`entry_id`;
+	`entry`.`id` = `user_feed_readitems`.`entry_id`
+LEFT JOIN `user_entry_label` ON
+	`user_entry_label`.`user_id` = `user_feed`.`user_id` AND
+	`user_entry_label`.`feed_entry_id` = `entry`.`id`;
 
 -- -----------------------------------------------------
 -- View `nican`.`home_view`
@@ -188,7 +206,6 @@ SELECT
 FROM `user_feed` 
 JOIN `feed_entry` as `entry` ON `user_feed`.`feed_id` = entry.feed_id 
 LEFT JOIN `user_feed_readitems` ON 
-	`user_feed`.`feed_id` = `user_feed_readitems`.`feed_id` AND 
 	`user_feed`.`user_id` = `user_feed_readitems`.`user_id` AND
 	`entry`.`id` = `user_feed_readitems`.`entry_id`
 GROUP BY `user_feed`.`user_id`, `user_feed`.`feed_id`;

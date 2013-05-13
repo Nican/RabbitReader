@@ -60,7 +60,8 @@ class FeedProvier {
       
       List<FeedItemList> newFeeds = parsed["Items"].map((Map feedItem){
         DateTime time = new DateTime.fromMillisecondsSinceEpoch( feedItem["Updated"] * 1000 );
-        Feed feed = reader.getFeedById(feedItem["FeedId"]);        
+        Feed feed = reader.getFeedById(feedItem["FeedId"]);    
+        List<String> labels = feedItem["Labels"].split(",");
         
         return new FeedItemList( 
             feedItem["Id"], 
@@ -69,7 +70,8 @@ class FeedProvier {
             feedItem["Link"], 
             feedItem["Author"], 
             feed, 
-            feedItem["IsRead"] > 0 );
+            feedItem["IsRead"] > 0,
+            labels);
         
       } ).toList();
       
@@ -93,7 +95,7 @@ class Feed {
   StreamController<Feed> onUpdateController = new StreamController<Feed>();
   Stream<Feed> get onUpdate => onUpdateController.stream;
   
-  Feed(this.id, this.title, this.link, this.description, this.lastUpdate, this.group, this.unreadItems);
+  Feed(this.id, this.title, this.link, this.description, this.lastUpdate, this.group, this.unreadItems );
   
   void fireUpdate(){
     onUpdateController.add(this);
@@ -109,13 +111,13 @@ class FeedItemList {
   String author;
   Feed feed;
   bool isRead;
-  
+  List<String> labels;
   String content;
   
   StreamController<FeedItemList> onUpdateController = new StreamController<FeedItemList>();
   Stream<FeedItemList> get onUpdate => onUpdateController.stream;
   
-  FeedItemList(this.id, this.title, this.published, this.link, this.author, this.feed, this.isRead );
+  FeedItemList(this.id, this.title, this.published, this.link, this.author, this.feed, this.isRead, this.labels );
   
   String getFormattedTime(){
     DateTime today = new DateTime.now();
@@ -137,6 +139,22 @@ class FeedItemList {
     
     feed.unreadItems -= 1;
     feed.fireUpdate();
+  }
+  
+  Future<bool> updateLabels(){
+    
+    var completer = new Completer<bool>();
+    FormData data = new FormData();
+    data.append("id", id.toString() );
+    data.append("labels", labels.join(",") );
+    
+    HttpRequest.request("http://localhost:8080/updateLabels", method: "POST", sendData: data).then((HttpRequest request){
+      completer.complete(true);      
+    }, onError: (e){
+      completer.completeError(e);
+    });
+    
+    return completer.future;
   }
   
   Future<String> getContent(){

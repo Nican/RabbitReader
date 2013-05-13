@@ -120,7 +120,8 @@ func (self SQLImporter) OnSubscription(feed *Subscription, group string) {
 	
 }
 
-func (self SQLImporter) ReadFeedItem(item FeedItem) {
+func (self SQLImporter) ReadFeedItem(item FeedItem) uint64 {
+	//Assert that the first 5 letters are "feed/"
 	if !strings.HasPrefix(item.Origin.StreamId, "feed/") {
 		//Ignoring unkown items for now, such as 'pop/topic/top/language/en' found in my feed (youtube video)
 		//TODO: Fill the edge cases of unkown stream id.		
@@ -130,7 +131,7 @@ func (self SQLImporter) ReadFeedItem(item FeedItem) {
 	//Check if we already added the item.
 	for _, id := range self.entryIds {
 		if id == item.Id {
-			return
+			return 0
 		}
 	}
 	
@@ -177,7 +178,7 @@ func (self SQLImporter) ReadFeedItem(item FeedItem) {
 		content = item.Content.Content
 	}
 	
-	_, _, err := self.transaction.Query("INSERT IGNORE INTO `feed_entry`(`feed_id`,`title`,`content`,`link`,`published`,`updated`,`author`,`guid`) VALUES (%d,'%s','%s','%s','%s','%s','%s','%s')",
+	_, res, err := self.transaction.Query("INSERT IGNORE INTO `feed_entry`(`feed_id`,`title`,`content`,`link`,`published`,`updated`,`author`,`guid`) VALUES (%d,'%s','%s','%s','%s','%s','%s','%s')",
 		feedId,
 		gConn.Escape(item.Title),
 		gConn.Escape(content),
@@ -186,33 +187,44 @@ func (self SQLImporter) ReadFeedItem(item FeedItem) {
 		time.Unix( int64(item.Updated), 0 ),
 		gConn.Escape( item.Author ),
 		gConn.Escape( item.Id ) )
-
+	
 	if err != nil {
 		panic(err)
 	}
 	
+	entryId := res.InsertId()
+	
 	self.entryIds = append(self.entryIds, item.Id )
-}
-
-func (self SQLImporter) ReadFeedItems(items []FeedItem) {
-
-	//Assert that the first 5 letters are "feed/"
-	for _, item := range items {
-		self.ReadFeedItem(item)
-	}
-
+	
+	return entryId
 }
 
 func (self SQLImporter) OnStarred(feed *FeedItems) {
-	self.ReadFeedItems(feed.Items)
+	for _, item := range feed.Items {
+		entryId := self.ReadFeedItem(item)
+		
+		if entryId != 0 {
+			_, _, err := self.transaction.Query("INSERT IGNORE INTO `user_entry_label`(`user_id`,`feed_entry_id`,`label`) VALUES (%d,%d,'star')",
+				self.userId, 
+				entryId )
+			
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
 }
 
 func (self SQLImporter) OnLiked(feed *FeedItems) {
-	self.ReadFeedItems(feed.Items)
+	for _, item := range feed.Items {
+		self.ReadFeedItem(item)
+	}
 }
 
 func (self SQLImporter) OnShared(feed *FeedItems) {
-	self.ReadFeedItems(feed.Items)
+	for _, item := range feed.Items {
+		self.ReadFeedItem(item)
+	}
 }
 
 func SQLImport(userId uint32, file string) (retErr error ){

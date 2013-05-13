@@ -38,23 +38,17 @@ type ChannelViewItem struct {
 	FeedTitle string
 	FeedId    int
 	IsRead    int
+	Labels    string
 }
 
-type errorResponse struct {
-	errStr string
+type ErrorResponse struct {
+	ErrStr string
 }
 
 func respondError( w http.ResponseWriter, errStr string ){
-	w.WriteHeader( 500 ) //Internal server error
-	
-	b, err := json.Marshal(errorResponse{errStr})
-
-	if err != nil {
-		panic(err)
-	}
-	
-	fmt.Fprint(w, b)
-} 
+	w.WriteHeader( 500 ) //Internal server error	
+	fmt.Fprint(w, errStr )
+}
 
 func serveHome(w http.ResponseWriter, r *http.Request) {
 
@@ -62,7 +56,7 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 	rows, _, err := GetConnection().Query("SELECT `id`,`title`,`link`,`description`,`last_update`,`user_id`,`group`,`unread` FROM home_view WHERE user_id=%d", userId)
 
 	if err != nil {
-		respondError( w, err.Error() ) 
+		respondError( w, err.Error() )
 		return
 	}
 
@@ -109,7 +103,7 @@ func serveFeedItems(w http.ResponseWriter, r *http.Request) {
 		searchQuery = fmt.Sprintf("%s AND `feedid`=%d", searchQuery, feedId)
 	}
 
-	rows, _, err := GetConnection().Query("SELECT `id`,`title`,`published`,`updated`,`link`,`author`,`feedtitle`,`feedid`,`is_read` FROM `entrylist` WHERE %s ORDER BY `updated` DESC LIMIT %d,100", searchQuery, start)
+	rows, _, err := GetConnection().Query("SELECT `id`,`title`,`published`,`updated`,`link`,`author`,`feedtitle`,`feedid`,`is_read`,`label` FROM `entrylist` WHERE %s ORDER BY `updated` DESC LIMIT %d,100", searchQuery, start)
 
 	if err != nil {
 		respondError( w, err.Error() ) 
@@ -120,7 +114,7 @@ func serveFeedItems(w http.ResponseWriter, r *http.Request) {
 
 	for id, row := range rows {
 		updated := row.Time(3, time.Local).Unix()
-		feeds[id] = ChannelViewItem{row.Int(0), row.Str(1), row.Str(2), updated, row.Str(4), row.Str(5), row.Str(6), row.Int(7), row.Int(8)}
+		feeds[id] = ChannelViewItem{row.Int(0), row.Str(1), row.Str(2), updated, row.Str(4), row.Str(5), row.Str(6), row.Int(7), row.Int(8), row.Str(9) }
 	}
 
 	b, err := json.Marshal(ChannelView{feeds})
@@ -145,7 +139,8 @@ func serveGetItem(w http.ResponseWriter, r *http.Request) {
 	userId := 1
 
 	if err != nil {
-		panic(err)
+		respondError( w, err.Error() ) 
+		return
 	}
 
 	rows, _, err := GetConnection().Query("SELECT `content` FROM `feed_entry` WHERE id=%d", id)
@@ -192,6 +187,40 @@ func serveGetItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Fprint(w, string(b))
+}
+
+func serveUpdateItemLabels(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(400)
+		fmt.Fprint(w, "Not a post request.")
+		return
+	}
+	
+	entryId, err := strconv.ParseInt(r.FormValue("id"), 10, 64)
+	labels := GetConnection().Escape( r.FormValue("labels") )
+	userId := 1
+
+	if err != nil {
+		respondError( w, err.Error() )
+		return
+	}	
+	
+	getQuery := func() string {
+		if labels == "" {
+			return fmt.Sprintf("DELETE FROM `user_entry_label` WHERE `user_id`=%d AND `feed_entry_id`=%d", userId, entryId )
+		}
+		return fmt.Sprintf("INSERT IGNORE INTO `user_entry_label`(`user_id`,`feed_entry_id`,`label`) VALUES (%d,%d,'%s')", userId, entryId, labels )
+	}
+	
+	_, _, err = GetConnection().QueryFirst(getQuery())
+
+	if err != nil {
+		respondError( w, err.Error() ) 
+		return
+	}
+	
+	fmt.Fprint(w, "{\"success\":1}")
+	
 }
 
 func updatePriorities(transaction mysql.Transaction, userId int, newPriorities map[string]GroupInfo) error {
@@ -261,6 +290,7 @@ func StartWebserver() {
 	http.HandleFunc("/home", serveHome)
 	http.HandleFunc("/feed", serveFeedItems)
 	http.HandleFunc("/item", serveGetItem)
+	http.HandleFunc("/updateLabels", serveUpdateItemLabels )
 	http.HandleFunc("/updateOrder", serveUpdateOrder)
 	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("web"))))
 
