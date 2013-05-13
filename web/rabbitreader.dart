@@ -19,7 +19,7 @@ class RabbitReader {
   
   FeedEntryListWidget entries = new FeedEntryListWidget();
   
-  void setFeedProdiver(FeedProvier provider){
+  void setFeedProdiver(FeedEntryProvier provider){
     entries.setFeedProdiver(provider);
   }
   
@@ -33,37 +33,37 @@ class RabbitReader {
   }
 }
 
-class FeedProvier {
+class FeedEntryProvier {
   
   int itemsPerPage = 100;
   String query;
   
-  FeedProvier(){
+  FeedEntryProvier(){
     query = "";
   }
   
-  FeedProvier.byGroup( String group ){
+  FeedEntryProvier.byGroup( String group ){
     query = "group=${group}";
   }
   
-  FeedProvier.byFeed( Feed feed ){
+  FeedEntryProvier.byFeed( Feed feed ){
     query = "feed=${feed.id}";
   }
   
   
-  Future<List<FeedItemList>> getPage({ int page: 0 }){
-    Completer<List<FeedItemList>> completer = new Completer();
+  Future<List<FeedEntry>> getPage({ int page: 0 }){
+    Completer<List<FeedEntry>> completer = new Completer();
     String href = "http://localhost:8080/feed?${query}&start=${page * itemsPerPage}";
     
     HttpRequest.getString(href).then((t){
       Map parsed = parse(t);
       
-      List<FeedItemList> newFeeds = parsed["Items"].map((Map feedItem){
+      List<FeedEntry> newFeeds = parsed["Items"].map((Map feedItem){
         DateTime time = new DateTime.fromMillisecondsSinceEpoch( feedItem["Updated"] * 1000 );
         Feed feed = reader.getFeedById(feedItem["FeedId"]);    
         List<String> labels = feedItem["Labels"].split(",");
         
-        return new FeedItemList( 
+        return new FeedEntry( 
             feedItem["Id"], 
             feedItem["Title"], 
             time, 
@@ -103,7 +103,7 @@ class Feed {
   
 }
 
-class FeedItemList {
+class FeedEntry {
   int id;
   String title;
   DateTime published;
@@ -114,10 +114,10 @@ class FeedItemList {
   List<String> labels;
   String content;
   
-  StreamController<FeedItemList> onUpdateController = new StreamController<FeedItemList>();
-  Stream<FeedItemList> get onUpdate => onUpdateController.stream;
+  StreamController<FeedEntry> onUpdateController = new StreamController<FeedEntry>();
+  Stream<FeedEntry> get onUpdate => onUpdateController.stream;
   
-  FeedItemList(this.id, this.title, this.published, this.link, this.author, this.feed, this.isRead, this.labels );
+  FeedEntry(this.id, this.title, this.published, this.link, this.author, this.feed, this.isRead, this.labels );
   
   String getFormattedTime(){
     DateTime today = new DateTime.now();
@@ -177,8 +177,6 @@ void main() {
   ui.RootPanel.get("feedList").add(feedTree);
   ui.RootPanel.get("entryBody").add(reader.entries);
   
-  
-
   HttpRequest.getString("http://localhost:8080/home").then((t){
     Map parsed = parse(t);
     
@@ -187,7 +185,7 @@ void main() {
     } ).toList();
     
     newFeeds.forEach(reader.addFeed);
-    reader.setFeedProdiver(new FeedProvier());
+    reader.setFeedProdiver(new FeedEntryProvier());
   });
   
 }

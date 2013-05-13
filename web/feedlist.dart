@@ -1,38 +1,64 @@
 part of RabbitReader;
 
 class FeedEntryListWidget extends ui.FlowPanel{
-  FeedProvier provider;
+  FeedEntryProvier provider;
+  
+  int currentPage = 0;
+  bool isLoading = false;
+  bool hasMore = true;
   
   FeedEntryListWidget(){
-  }
-  
-  void setFeedProdiver(FeedProvier provider){
-    this.provider = provider;
-    this.clear();
-    this.provider.getPage(page: 0).then(addFeeds);
+    setStylePrimaryName("entry-list");
     
+    getElement().onScroll.listen(this.onScroll);
   }
   
-  void addFeeds( List<FeedItemList> feedItems ){
+  void setFeedProdiver(FeedEntryProvier provider){
+    this.provider = provider;
+    this.hasMore = true;
+    this.clear();
+    currentPage = 0;
+    loadPage();
+  }
+  
+  void loadPage(){
+    if(!this.hasMore || this.isLoading)
+      return;
+    
+    this.provider.getPage(page: currentPage).then(addFeeds);
+    currentPage++;
+    this.isLoading = true;
+  }
+  
+  void addFeeds( List<FeedEntry> feedItems ){
+    this.isLoading = false;
+    if( feedItems.length == 0 )
+      this.hasMore = false;
     
     feedItems.map((feed){
-      return new FeedEntryListWidgetEntry(feed);
+      return new FeedEntryListItemWidget(feed);
     }).forEach(this.add);
     
   }
   
   void closeAll(){
     getChildren().forEach((ui.Widget widget){
-      if( widget is FeedEntryListWidgetEntry ){
-        (widget as FeedEntryListWidgetEntry).closeContent();
+      if( widget is FeedEntryListItemWidget ){
+        (widget as FeedEntryListItemWidget).closeContent();
       }
     });
   }
   
+  void onScroll(Event event){
+    if( getElement().scrollHeight - getElement().offsetHeight - getElement().scrollTop < 500 ){
+      loadPage();      
+    }
+  }
+  
 }
 
-class FeedEntryListWidgetEntry extends ui.FlowPanel{
-  FeedItemList item;
+class FeedEntryListItemWidget extends ui.FlowPanel{
+  FeedEntry item;
   
   ui.Label starLabel = new ui.Label("");
   ui.Label titleLabel = new ui.Label();
@@ -44,7 +70,7 @@ class FeedEntryListWidgetEntry extends ui.FlowPanel{
   bool isOpen = false;
   Element title = new DivElement();
   
-  FeedEntryListWidgetEntry(this.item){
+  FeedEntryListItemWidget(this.item){
     title.classes.add("entry-title");
     
     getElement().append(title);
@@ -119,7 +145,7 @@ class FeedEntryListWidgetEntry extends ui.FlowPanel{
   
   void updateContent(){
     item.getContent().then((String model){
-      var widget = new FeedItemContentWidget(item);
+      var widget = new FeedEntryContentWidget(item);
       content.remove(content.getWidget());
       content.add(widget);
       
@@ -131,14 +157,14 @@ class FeedEntryListWidgetEntry extends ui.FlowPanel{
   
 }
 
-class FeedItemContentWidget extends ui.FlowPanel {
-  FeedItemList entry;
+class FeedEntryContentWidget extends ui.FlowPanel {
+  FeedEntry entry;
   
   ui.Anchor title = new ui.Anchor();
   ui.Label author = new ui.Label();
   ui.HtmlPanel content = new ui.HtmlPanel("");
   
-  FeedItemContentWidget(this.entry){
+  FeedEntryContentWidget(this.entry){
     setStylePrimaryName("feed-content");
     
     title.text = entry.title;

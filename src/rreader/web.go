@@ -287,12 +287,12 @@ func serveUpdateOrder(w http.ResponseWriter, r *http.Request) {
 
 func StartWebserver() {
 
-	http.HandleFunc("/home", serveHome)
-	http.HandleFunc("/feed", serveFeedItems)
-	http.HandleFunc("/item", serveGetItem)
+	http.HandleFunc("/home", serveHome )
+	http.HandleFunc("/feed", serveFeedItems )
+	http.HandleFunc("/item", serveGetItem )
 	http.HandleFunc("/updateLabels", serveUpdateItemLabels )
-	http.HandleFunc("/updateOrder", serveUpdateOrder)
-	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("web"))))
+	http.HandleFunc("/updateOrder", serveUpdateOrder )
+	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("web"))) )
 
 	http.ListenAndServe(":8080", nil)
 }

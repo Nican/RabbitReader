@@ -29,14 +29,14 @@ class TreeLabel extends ui.FlowPanel implements event.HasClickHandlers {
   }
 }
 
-abstract class SortableTreeItemWidget extends ui.TreeItem  {
+abstract class SortableTreeItem extends ui.TreeItem  {
   
-  static SortableTreeItemWidget startDrag; 
+  static SortableTreeItem startDrag; 
   static Element lastDragged = null;
   
   TreeLabel label = new TreeLabel();
   
-  SortableTreeItemWidget(){
+  SortableTreeItem(){
     setWidget(label);
     label.setStylePrimaryName("scroll-tree-item");
     
@@ -61,7 +61,7 @@ abstract class SortableTreeItemWidget extends ui.TreeItem  {
     label.unread = getUnreadItems();
     
     ui.TreeItem parent = this.getParentItem();
-    if( parent is SortableTreeItemWidget ){ parent.updateTitle(); }
+    if( parent is SortableTreeItem ){ parent.updateTitle(); }
   }
   
   void dragStart(MouseEvent event){
@@ -115,7 +115,7 @@ abstract class SortableTreeItemWidget extends ui.TreeItem  {
     
     ui.TreeItem parent = this.getParentItem();
     
-    if( startDrag is FeedTreeGroupWidget && parent is FeedTreeGroupWidget ){
+    if( startDrag is TreeGroupWidget && parent is TreeGroupWidget ){
       return;
     }
     
@@ -149,17 +149,17 @@ abstract class SortableTreeItemWidget extends ui.TreeItem  {
     reader.setFeedProdiver(getProvider());
   }
   
-  FeedProvier getProvider();
+  FeedEntryProvier getProvider();
   int getUnreadItems();
   String getTitle();
   
 }
 
-class FeedTreeItemWidget extends SortableTreeItemWidget implements event.ClickHandler  {
+class FeedLabelWidget extends SortableTreeItem implements event.ClickHandler  {
   Feed feed;
   StreamSubscription onUpdateSubscription;
   
-  FeedTreeItemWidget(this.feed){
+  FeedLabelWidget(this.feed){
     feed.onUpdate.listen((Feed feed){ this.updateTitle(); });
   }
   
@@ -175,8 +175,8 @@ class FeedTreeItemWidget extends SortableTreeItemWidget implements event.ClickHa
   }
   */
   
-  FeedProvier getProvider(){
-    return new FeedProvier.byFeed(feed);
+  FeedEntryProvier getProvider(){
+    return new FeedEntryProvier.byFeed(feed);
   }
   
   int getUnreadItems(){
@@ -189,21 +189,21 @@ class FeedTreeItemWidget extends SortableTreeItemWidget implements event.ClickHa
 
 }
 
-class FeedTreeGroupWidget extends SortableTreeItemWidget implements event.ClickHandler {
+class TreeGroupWidget extends SortableTreeItem implements event.ClickHandler {
   String group;
   
-  FeedTreeGroupWidget(this.group) {
+  TreeGroupWidget(this.group) {
   }
   
-  FeedProvier getProvider(){
-    return new FeedProvier.byGroup(group);
+  FeedEntryProvier getProvider(){
+    return new FeedEntryProvier.byGroup(group);
   }
   
   int getUnreadItems(){
     if( getChildren() == null )
       return 0;
     
-    return this.getChildren().fold(0, (val, SortableTreeItemWidget child){
+    return this.getChildren().fold(0, (val, SortableTreeItem child){
       return val + child.getUnreadItems();
     });
   }
@@ -228,7 +228,7 @@ class FeedTreeWidget extends ui.Tree {
   }
   
   void onFeedAdded(Feed feed){
-    FeedTreeItemWidget widget = new FeedTreeItemWidget(feed);
+    FeedLabelWidget widget = new FeedLabelWidget(feed);
     
     String group = widget.feed.group;
     
@@ -242,7 +242,7 @@ class FeedTreeWidget extends ui.Tree {
       return;
     }
     
-    FeedTreeGroupWidget leaf = new FeedTreeGroupWidget(group);
+    TreeGroupWidget leaf = new TreeGroupWidget(group);
     leaf.addItem(widget);
     addItem(leaf);
     
@@ -254,10 +254,10 @@ class FeedTreeWidget extends ui.Tree {
     int currentPriority = 0;
     
     void addToMap( ui.TreeItem item ){
-      if( item is FeedTreeItemWidget ){
+      if( item is FeedLabelWidget ){
         String group = "";
         
-        if( item.getParentItem() is FeedTreeGroupWidget )
+        if( item.getParentItem() is TreeGroupWidget )
           group = item.getParentItem().group;
         
         orderMap[ item.feed.id.toString() ] = {'priority': currentPriority, 'group': group};
