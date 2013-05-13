@@ -3,6 +3,7 @@ library RabbitReader;
 import 'dart:html';
 import 'dart:json';
 import 'dart:async';
+import 'dart:uri';
 import 'package:dart_web_toolkit/ui.dart' as ui;
 import 'package:dart_web_toolkit/event.dart' as event;
 

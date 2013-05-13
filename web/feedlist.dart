@@ -166,6 +166,7 @@ class FeedEntryContentWidget extends ui.FlowPanel {
   
   FeedEntryContentWidget(this.entry){
     setStylePrimaryName("feed-content");
+    Uri sourceUri = Uri.parse(entry.feed.link);
     
     title.text = entry.title;
     author.text = entry.author;
@@ -175,7 +176,16 @@ class FeedEntryContentWidget extends ui.FlowPanel {
     title.href = entry.link;
     
     content.setStylePrimaryName("feed-content-body");
-    content.getElement().innerHtml =  entry.content;   
+    content.getElement().innerHtml =  entry.content; 
+    content.getElement().queryAll("img").forEach((ImageElement elem){
+      Uri uri = Uri.parse(elem.src);
+      
+      //You can thank Original Life for this one. (http://jaynaylor.com/originallife/)
+      //They do not specify their hostname in the path. We replace it here for their domain.
+      if( uri.domain == window.location.hostname)
+         elem.src = "${sourceUri.origin}/${uri.path}?${uri.query}"; 
+      
+    });
     
     content.getElement().queryAll("a").forEach((anchor){
       anchor.target = "_blank";
