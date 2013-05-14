@@ -1,0 +1,9 @@
+{
+	"MySQL": {
+		"localAddr": "",
+		"address": "192.168.1.6:3306",
+		"user": "root",
+		"password": "password",
+		"database": "rreader"
+	}
+}

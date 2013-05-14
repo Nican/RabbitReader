@@ -24,6 +24,19 @@ class RabbitReader {
     entries.setFeedProdiver(provider);
   }
   
+  void newFeedData( Map feedData ){
+    Feed feed = getFeedById(feedData["Id"]);
+    
+    if(feed != null ){
+      feed.setData(feedData);
+      return;
+    }
+    
+    feed = new Feed(feedData["Id"]);
+    feed.setData(feedData);
+    addFeed(feed);
+  }
+  
   void addFeed(Feed feed){
     this.feeds.add(feed);
     onFeedAddedController.add(feed);
@@ -32,6 +45,37 @@ class RabbitReader {
   Feed getFeedById(int id){
     return feeds.firstWhere((Feed feed){ return feed.id == id; }, orElse: (){ return null;} );
   }
+}
+
+class Feed {
+  int id;
+  String title;
+  String link;
+  String description;
+  int lastUpdate;
+  String group;
+  int unreadItems;
+  
+  StreamController<Feed> onUpdateController = new StreamController<Feed>();
+  Stream<Feed> get onUpdate => onUpdateController.stream;
+  
+  Feed(this.id);
+  
+  void setData(Map feedData){
+    this.title = feedData["Title"]; 
+    this.link = feedData["Link"]; 
+    this.description = feedData["Description"]; 
+    this.lastUpdate = feedData["LastUpdate"]; 
+    this.group = feedData["Group"]; 
+    this.unreadItems = feedData["Unread"];
+    
+    this.fireUpdate();
+  }
+  
+  void fireUpdate(){
+    onUpdateController.add(this);
+  }
+  
 }
 
 class FeedEntryProvier {
@@ -49,6 +93,10 @@ class FeedEntryProvier {
   
   FeedEntryProvier.byFeed( Feed feed ){
     query = "feed=${feed.id}";
+  }
+  
+  FeedEntryProvier.byStarred() {
+    query = "starred=1";
   }
   
   
@@ -84,26 +132,6 @@ class FeedEntryProvier {
   
 }
 
-class Feed {
-  int id;
-  String title;
-  String link;
-  String description;
-  int lastUpdate;
-  String group;
-  int unreadItems;
-  
-  StreamController<Feed> onUpdateController = new StreamController<Feed>();
-  Stream<Feed> get onUpdate => onUpdateController.stream;
-  
-  Feed(this.id, this.title, this.link, this.description, this.lastUpdate, this.group, this.unreadItems );
-  
-  void fireUpdate(){
-    onUpdateController.add(this);
-  }
-  
-}
-
 class FeedEntry {
   int id;
   String title;
@@ -120,12 +148,19 @@ class FeedEntry {
   
   FeedEntry(this.id, this.title, this.published, this.link, this.author, this.feed, this.isRead, this.labels );
   
+  String _pad(String input, int characters){
+    while( input.length < characters ){
+      input = "0" + input;
+    }
+    return input;
+  }
+  
   String getFormattedTime(){
     DateTime today = new DateTime.now();
     
     
     if( today.day == published.day && today.month == published.month && today.year == published.year){
-      return "${published.hour}:${published.minute}";
+      return "${_pad(published.hour.toString(),2)}:${_pad(published.minute.toString(),2)}";
     }
     
     return "${published.month}/${published.day}/${published.year}";
@@ -173,19 +208,23 @@ class FeedEntry {
   }
 }
 
+void requestForUpdate(){
+  HttpRequest.getString("http://localhost:8080/home?update=1").then((t){
+    Map parsed = parse(t);
+    parsed["Feeds"].forEach(reader.newFeedData);
+  });
+}
+
 void main() {
-  FeedTreeWidget feedTree = new FeedTreeWidget();  
-  ui.RootPanel.get("feedList").add(feedTree);
+  ui.RootPanel.get("feedList").add(new Menu());
   ui.RootPanel.get("entryBody").add(reader.entries);
   
   HttpRequest.getString("http://localhost:8080/home").then((t){
     Map parsed = parse(t);
+    parsed["Feeds"].forEach(reader.newFeedData);
     
-    List<Feed> newFeeds = parsed["Feeds"].map((Map feed){
-      return new Feed( feed["Id"], feed["Title"], feed["Link"], feed["Description"], feed["LastUpdate"], feed["Group"], feed["Unread"] );
-    } ).toList();
+    requestForUpdate();
     
-    newFeeds.forEach(reader.addFeed);
     reader.setFeedProdiver(new FeedEntryProvier());
   });
   

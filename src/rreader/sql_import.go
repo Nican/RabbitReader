@@ -2,7 +2,6 @@ package rreader
 
 import (
 	_ "database/sql"
-	"github.com/ziutek/mymysql/thrsafe"
 	"github.com/ziutek/mymysql/mysql"
 	_ "github.com/ziutek/mymysql/native" // Native engine
 	"strings"
@@ -18,20 +17,6 @@ type SQLImporter struct {
 	entryIds []string
 }
 
-var gConn mysql.Conn
-
-func GetConnection() mysql.Conn {
-	return gConn
-}
-
-func OpenDB() {
-	gConn = thrsafe.New("tcp", "", "192.168.1.6:3306", "root", "password", "nican")
-	
-	err := gConn.Connect()
-	if err != nil {
-		panic(err)
-	}
-}
 /*
 func (self SQLImporter) getGroup(group string) uint32 {
 	groupId, present := self.groupIds[group]

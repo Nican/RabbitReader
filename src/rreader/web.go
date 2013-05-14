@@ -51,10 +51,13 @@ func respondError( w http.ResponseWriter, errStr string ){
 }
 
 func serveHome(w http.ResponseWriter, r *http.Request) {
-
+	if r.FormValue("update") != "" {
+		UpdateFeeds(60)
+	}
+	
 	var userId uint32 = 1
 	rows, _, err := GetConnection().Query("SELECT `id`,`title`,`link`,`description`,`last_update`,`user_id`,`group`,`unread` FROM home_view WHERE user_id=%d", userId)
-
+	
 	if err != nil {
 		respondError( w, err.Error() )
 		return
@@ -84,6 +87,7 @@ func serveFeedItems(w http.ResponseWriter, r *http.Request) {
 
 	group := r.FormValue("group")
 	feed := r.FormValue("feed")
+	starred := r.FormValue("starred")
 	start, err := strconv.ParseInt(r.FormValue("start"), 10, 64)
 
 	if err != nil {
@@ -101,6 +105,8 @@ func serveFeedItems(w http.ResponseWriter, r *http.Request) {
 		}
 
 		searchQuery = fmt.Sprintf("%s AND `feedid`=%d", searchQuery, feedId)
+	} else if starred != "" {
+		searchQuery = fmt.Sprintf("%s AND `label`='star'", searchQuery)
 	}
 
 	rows, _, err := GetConnection().Query("SELECT `id`,`title`,`published`,`updated`,`link`,`author`,`feedtitle`,`feedid`,`is_read`,`label` FROM `entrylist` WHERE %s ORDER BY `updated` DESC LIMIT %d,100", searchQuery, start)

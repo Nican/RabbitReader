@@ -45,6 +45,8 @@ func UpdateFeeds(age int) error {
 	waitGroup.Wait()
 	gUpdateMutex.Unlock()
 	
+	fmt.Println("Updated finished!")
+	
 	return nil
 }
 
@@ -182,12 +184,6 @@ func findItems(node *xmlx.Node, callback onItem){
 func updateFeed( feedId int, uri string ) (retErr error ) {
 	
 	const ns = "*"
-	doc := xmlx.New()
-
-	if err := doc.LoadUriClient(uri, http.DefaultClient, CharsetReader); err != nil {
-		return err
-	}
-	
 	conn := gConn.Clone()
 	if err := conn.Connect(); err != nil {
 		return err
@@ -207,6 +203,18 @@ func updateFeed( feedId int, uri string ) (retErr error ) {
         }
         conn.Close()
     }()
+    
+    _, _, err = transaction.Query("UPDATE `feed` SET `last_update`=now() WHERE `id`=%d", feedId)
+	
+	if err != nil {
+		panic(err)
+	}
+    
+    doc := xmlx.New()
+
+	if err = doc.LoadUriClient(uri, http.DefaultClient, CharsetReader); err != nil {
+		return err
+	}
 	
 	findFeedEntry := func( title string, content string, date string, guid string ) bool {
 		search := ""
@@ -303,12 +311,6 @@ func updateFeed( feedId int, uri string ) (retErr error ) {
 		}
 	
 	} )
-	
-	_, _, err = transaction.Query("UPDATE `feed` SET `last_update`=now() WHERE `id`=%d", feedId)
-	
-	if err != nil {
-		panic(err)
-	}
 	
 	return nil
 }

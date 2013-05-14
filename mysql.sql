@@ -2,13 +2,13 @@ SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='TRADITIONAL,ALLOW_INVALID_DATES';
 
-CREATE SCHEMA IF NOT EXISTS `nican` DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci ;
-USE `nican` ;
+CREATE SCHEMA IF NOT EXISTS `rreader` DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci ;
+USE `rreader` ;
 
 -- -----------------------------------------------------
--- Table `nican`.`feed`
+-- Table `rreader`.`feed`
 -- -----------------------------------------------------
-CREATE  TABLE IF NOT EXISTS `nican`.`feed` (
+CREATE  TABLE IF NOT EXISTS `rreader`.`feed` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT ,
   `title` VARCHAR(64) NOT NULL ,
   `link` VARCHAR(128) NOT NULL ,
@@ -22,9 +22,9 @@ ENGINE = InnoDB;
 
 
 -- -----------------------------------------------------
--- Table `nican`.`feed_entry`
+-- Table `rreader`.`feed_entry`
 -- -----------------------------------------------------
-CREATE  TABLE IF NOT EXISTS `nican`.`feed_entry` (
+CREATE  TABLE IF NOT EXISTS `rreader`.`feed_entry` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT ,
   `feed_id` INT UNSIGNED NOT NULL ,
   `title` TINYTEXT NOT NULL ,
@@ -39,16 +39,16 @@ CREATE  TABLE IF NOT EXISTS `nican`.`feed_entry` (
   INDEX `feed_entry_guid` USING BTREE (`guid` ASC) ,
   CONSTRAINT `parentFeed`
     FOREIGN KEY (`feed_id` )
-    REFERENCES `nican`.`feed` (`id` )
+    REFERENCES `rreader`.`feed` (`id` )
     ON DELETE CASCADE
     ON UPDATE NO ACTION)
 ENGINE = InnoDB;
 
 
 -- -----------------------------------------------------
--- Table `nican`.`users`
+-- Table `rreader`.`users`
 -- -----------------------------------------------------
-CREATE  TABLE IF NOT EXISTS `nican`.`users` (
+CREATE  TABLE IF NOT EXISTS `rreader`.`users` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT ,
   `name` VARCHAR(45) NULL ,
   `last_access` TIMESTAMP NULL ,
@@ -58,9 +58,9 @@ ENGINE = InnoDB;
 
 
 -- -----------------------------------------------------
--- Table `nican`.`user_feed`
+-- Table `rreader`.`user_feed`
 -- -----------------------------------------------------
-CREATE  TABLE IF NOT EXISTS `nican`.`user_feed` (
+CREATE  TABLE IF NOT EXISTS `rreader`.`user_feed` (
   `user_id` INT UNSIGNED NOT NULL ,
   `feed_id` INT UNSIGNED NOT NULL ,
   `newest_read` DATETIME NOT NULL COMMENT 'All items before this date will be marked as read. ' ,
@@ -73,21 +73,21 @@ CREATE  TABLE IF NOT EXISTS `nican`.`user_feed` (
   INDEX `groupIndex` (`group` ASC, `user_id` ASC) ,
   CONSTRAINT `parentUserFeed`
     FOREIGN KEY (`feed_id` )
-    REFERENCES `nican`.`feed` (`id` )
+    REFERENCES `rreader`.`feed` (`id` )
     ON DELETE CASCADE
     ON UPDATE CASCADE,
   CONSTRAINT `parentFeedUser`
     FOREIGN KEY (`user_id` )
-    REFERENCES `nican`.`users` (`id` )
+    REFERENCES `rreader`.`users` (`id` )
     ON DELETE CASCADE
     ON UPDATE CASCADE)
 ENGINE = InnoDB;
 
 
 -- -----------------------------------------------------
--- Table `nican`.`user_feed_readitems`
+-- Table `rreader`.`user_feed_readitems`
 -- -----------------------------------------------------
-CREATE  TABLE IF NOT EXISTS `nican`.`user_feed_readitems` (
+CREATE  TABLE IF NOT EXISTS `rreader`.`user_feed_readitems` (
   `user_id` INT UNSIGNED NOT NULL ,
   `entry_id` INT UNSIGNED NOT NULL ,
   PRIMARY KEY (`user_id`, `entry_id`) ,
@@ -95,63 +95,63 @@ CREATE  TABLE IF NOT EXISTS `nican`.`user_feed_readitems` (
   INDEX `readitems_feed_entry_idx` (`entry_id` ASC) ,
   CONSTRAINT `readitems_user`
     FOREIGN KEY (`user_id` )
-    REFERENCES `nican`.`users` (`id` )
+    REFERENCES `rreader`.`users` (`id` )
     ON DELETE NO ACTION
     ON UPDATE NO ACTION,
   CONSTRAINT `readitems_feed_entry`
     FOREIGN KEY (`entry_id` )
-    REFERENCES `nican`.`feed_entry` (`id` )
+    REFERENCES `rreader`.`feed_entry` (`id` )
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)
 ENGINE = InnoDB;
 
 
 -- -----------------------------------------------------
--- Table `nican`.`user_entry_label`
+-- Table `rreader`.`user_entry_label`
 -- -----------------------------------------------------
-CREATE  TABLE IF NOT EXISTS `nican`.`user_entry_label` (
+CREATE  TABLE IF NOT EXISTS `rreader`.`user_entry_label` (
   `user_id` INT UNSIGNED NOT NULL ,
   `feed_entry_id` INT UNSIGNED NOT NULL ,
   `label` VARCHAR(45) NULL ,
-  PRIMARY KEY (`user_id`, `feed_entry_id`) ,
   INDEX `user_feed_readitems-user_idx` (`user_id` ASC) ,
   INDEX `user_feed_readitems-entry_idx` (`feed_entry_id` ASC) ,
+  PRIMARY KEY (`user_id`, `feed_entry_id`) ,
   CONSTRAINT `user_feed_readitems-user`
     FOREIGN KEY (`user_id` )
-    REFERENCES `nican`.`users` (`id` )
+    REFERENCES `rreader`.`users` (`id` )
     ON DELETE CASCADE
     ON UPDATE CASCADE,
   CONSTRAINT `user_feed_readitems-entry`
     FOREIGN KEY (`feed_entry_id` )
-    REFERENCES `nican`.`feed_entry` (`id` )
+    REFERENCES `rreader`.`feed_entry` (`id` )
     ON DELETE CASCADE
     ON UPDATE CASCADE)
 ENGINE = InnoDB;
 
-USE `nican` ;
+USE `rreader` ;
 
 -- -----------------------------------------------------
--- Placeholder table for view `nican`.`entrylist`
+-- Placeholder table for view `rreader`.`entrylist`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `nican`.`entrylist` (`id` INT, `title` INT, `published` INT, `updated` INT, `link` INT, `author` INT, `feedtitle` INT, `feedid` INT, `userid` INT, `group` INT, `is_read` INT, `label` INT);
+CREATE TABLE IF NOT EXISTS `rreader`.`entrylist` (`id` INT, `title` INT, `published` INT, `updated` INT, `link` INT, `author` INT, `feedtitle` INT, `feedid` INT, `userid` INT, `group` INT, `is_read` INT, `label` INT);
 
 -- -----------------------------------------------------
--- Placeholder table for view `nican`.`home_view`
+-- Placeholder table for view `rreader`.`home_view`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `nican`.`home_view` (`id` INT, `title` INT, `link` INT, `description` INT, `last_update` INT, `user_id` INT, `group` INT, `priority` INT, `unread` INT);
+CREATE TABLE IF NOT EXISTS `rreader`.`home_view` (`id` INT, `title` INT, `link` INT, `description` INT, `last_update` INT, `user_id` INT, `group` INT, `priority` INT, `unread` INT);
 
 -- -----------------------------------------------------
--- Placeholder table for view `nican`.`unread_view`
+-- Placeholder table for view `rreader`.`unread_view`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `nican`.`unread_view` (`feed_id` INT, `user_id` INT, `unread` INT);
+CREATE TABLE IF NOT EXISTS `rreader`.`unread_view` (`feed_id` INT, `user_id` INT, `unread` INT);
 
 -- -----------------------------------------------------
 -- procedure update_unread
 -- -----------------------------------------------------
 
 DELIMITER $$
-USE `nican`$$
-CREATE PROCEDURE `nican`.`update_unread` ()
+USE `rreader`$$
+CREATE PROCEDURE `rreader`.`update_unread` ()
 BEGIN
 UPDATE user_feed 
 JOIN unread_view ON user_feed.user_id=unread_view.user_id AND user_feed.feed_id=unread_view.feed_id 
@@ -161,11 +161,11 @@ END$$
 DELIMITER ;
 
 -- -----------------------------------------------------
--- View `nican`.`entrylist`
+-- View `rreader`.`entrylist`
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `nican`.`entrylist`;
-USE `nican`;
-CREATE  OR REPLACE VIEW `nican`.`entrylist` AS
+DROP TABLE IF EXISTS `rreader`.`entrylist`;
+USE `rreader`;
+CREATE  OR REPLACE VIEW `rreader`.`entrylist` AS
 SELECT entry.id, entry.title, entry.published, entry.updated, entry.link, entry.author, 
 feed.title as `feedtitle`, feed.id AS `feedid`, user_feed.user_id as `userid`, `user_feed`.`group`, 
 	(`user_feed`.`newest_read` > `entry`.`updated` OR `user_feed_readitems`.`entry_id` IS NOT NULL) as `is_read`,
@@ -181,11 +181,11 @@ LEFT JOIN `user_entry_label` ON
 	`user_entry_label`.`feed_entry_id` = `entry`.`id`;
 
 -- -----------------------------------------------------
--- View `nican`.`home_view`
+-- View `rreader`.`home_view`
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `nican`.`home_view`;
-USE `nican`;
-CREATE  OR REPLACE VIEW `nican`.`home_view` AS
+DROP TABLE IF EXISTS `rreader`.`home_view`;
+USE `rreader`;
+CREATE  OR REPLACE VIEW `rreader`.`home_view` AS
 SELECT feed.id , feed.title, feed.link, feed.description, feed.last_update, user_feed.user_id,user_feed.group as `group`, user_feed.priority,
 `user_feed`.`unread_items` as `unread`
 FROM feed  
@@ -194,11 +194,11 @@ ORDER BY user_feed.priority, feed.title
 ;
 
 -- -----------------------------------------------------
--- View `nican`.`unread_view`
+-- View `rreader`.`unread_view`
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS `nican`.`unread_view`;
-USE `nican`;
-CREATE  OR REPLACE VIEW `nican`.`unread_view` AS
+DROP TABLE IF EXISTS `rreader`.`unread_view`;
+USE `rreader`;
+CREATE  OR REPLACE VIEW `rreader`.`unread_view` AS
 SELECT 
 	`user_feed`.`feed_id` AS `feed_id`, 
 	user_feed.user_id as `user_id`, 

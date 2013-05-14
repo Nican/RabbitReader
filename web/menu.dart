@@ -1,15 +1,39 @@
 part of RabbitReader;
 
+class Menu extends ui.FlowPanel{
+  FeedTreeWidget feedTree = new FeedTreeWidget();  
+  ui.Label home = new ui.Label("Home");
+  ui.Label starred = new ui.Label("Starred");
+  
+  Menu(){
+    add(home);
+    add(starred);
+
+    add(feedTree);
+    
+    home.getElement().onClick.listen(this.displayHome);
+    starred.getElement().onClick.listen(this.displayStarred);
+  }
+  
+  void displayHome(e){
+    reader.setFeedProdiver(new FeedEntryProvier());
+  }
+  
+  void displayStarred(e){
+    reader.setFeedProdiver(new FeedEntryProvier.byStarred());
+  }
+  
+  
+}
+
 class TreeLabel extends ui.FlowPanel implements event.HasClickHandlers {
   
   ui.Label titleLabel = new ui.Label();
-  ui.Label unreadLabel = new ui.Label();
+  ui.Label unreadLabel = new ui.Label("(0)");
   
   TreeLabel(){
     titleLabel.setStylePrimaryName("scroll-tree-item-title");
     unreadLabel.setStylePrimaryName("scroll-tree-item-unread");
-    
-    unreadLabel.text = "(3)";
     
     add(titleLabel);
     add(unreadLabel);
