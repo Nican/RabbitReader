@@ -15,6 +15,7 @@ var gUpdateMutex sync.Mutex;
 
 func UpdateFeeds(age int) error {
 	gUpdateMutex.Lock()
+	defer gUpdateMutex.Unlock()
 	
 	rows, _, err := GetConnection().Query("SELECT `id`,`feedURL` FROM `feed` WHERE `last_update` < DATE_SUB(now(), INTERVAL %d MINUTE) AND `disabled`=0", age )
 	
@@ -43,7 +44,12 @@ func UpdateFeeds(age int) error {
 	}
 	
 	waitGroup.Wait()
-	gUpdateMutex.Unlock()
+	
+	_, _, err = GetConnection().QueryFirst("CALL update_unread()")
+
+	if err != nil {
+		return err
+	}
 	
 	fmt.Println("Updated finished!")
 	
