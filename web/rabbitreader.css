@@ -107,7 +107,9 @@ h1, p {
 }
 
 .feed-content {
-  margin: 10px;
+  padding: 10px;
+  border-bottom: 1px #CCC solid;
+  
 }
 
 

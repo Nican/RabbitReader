@@ -20,7 +20,7 @@ class Menu extends ui.FlowPanel{
   }
   
   void displayStarred(e){
-    reader.setFeedProdiver(new FeedEntryProvier.byStarred());
+    reader.setFeedProdiver(new FeedEntryStarredProvier());
   }
   
   
@@ -200,7 +200,7 @@ class FeedLabelWidget extends SortableTreeItem implements event.ClickHandler  {
   */
   
   FeedEntryProvier getProvider(){
-    return new FeedEntryProvier.byFeed(feed);
+    return new FeedEntryFeedProvier(feed);
   }
   
   int getUnreadItems(){
@@ -220,7 +220,7 @@ class TreeGroupWidget extends SortableTreeItem implements event.ClickHandler {
   }
   
   FeedEntryProvier getProvider(){
-    return new FeedEntryProvier.byGroup(group);
+    return new FeedEntryGroupProvier(group);
   }
   
   int getUnreadItems(){
@@ -252,6 +252,9 @@ class FeedTreeWidget extends ui.Tree {
   }
   
   void onFeedAdded(Feed feed){
+    if(feed.active == false)
+      return;
+    
     FeedLabelWidget widget = new FeedLabelWidget(feed);
     
     String group = widget.feed.group;

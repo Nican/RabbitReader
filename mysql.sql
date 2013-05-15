@@ -67,10 +67,12 @@ CREATE  TABLE IF NOT EXISTS `rreader`.`user_feed` (
   `unread_items` INT UNSIGNED NULL ,
   `priority` INT UNSIGNED NOT NULL DEFAULT 0 ,
   `group` VARCHAR(64) NOT NULL ,
+  `active` TINYINT(1) NOT NULL DEFAULT 1 ,
   PRIMARY KEY (`user_id`, `feed_id`) ,
   INDEX `parentFeed_idx` (`feed_id` ASC) ,
   INDEX `parentUser_idx` (`user_id` ASC) ,
   INDEX `groupIndex` (`group` ASC, `user_id` ASC) ,
+  INDEX `user_feed-active` (`active` ASC) ,
   CONSTRAINT `parentUserFeed`
     FOREIGN KEY (`feed_id` )
     REFERENCES `rreader`.`feed` (`id` )
@@ -138,7 +140,7 @@ CREATE TABLE IF NOT EXISTS `rreader`.`entrylist` (`id` INT, `title` INT, `publis
 -- -----------------------------------------------------
 -- Placeholder table for view `rreader`.`home_view`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `rreader`.`home_view` (`id` INT, `title` INT, `link` INT, `description` INT, `last_update` INT, `user_id` INT, `group` INT, `priority` INT, `unread` INT);
+CREATE TABLE IF NOT EXISTS `rreader`.`home_view` (`id` INT, `title` INT, `link` INT, `description` INT, `last_update` INT, `user_id` INT, `group` INT, `priority` INT, `active` INT, `unread` INT);
 
 -- -----------------------------------------------------
 -- Placeholder table for view `rreader`.`unread_view`
@@ -186,7 +188,7 @@ LEFT JOIN `user_entry_label` ON
 DROP TABLE IF EXISTS `rreader`.`home_view`;
 USE `rreader`;
 CREATE  OR REPLACE VIEW `rreader`.`home_view` AS
-SELECT feed.id , feed.title, feed.link, feed.description, feed.last_update, user_feed.user_id,user_feed.group as `group`, user_feed.priority,
+SELECT feed.id , feed.title, feed.link, feed.description, feed.last_update, user_feed.user_id,user_feed.group as `group`, user_feed.priority, user_feed.active,
 `user_feed`.`unread_items` as `unread`
 FROM feed  
 JOIN user_feed ON feed.id = user_feed.feed_id 

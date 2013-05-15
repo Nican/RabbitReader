@@ -287,6 +287,10 @@ func updateFeed( feedId int, uri string ) (retErr error ) {
 			fmt.Printf("Warning: Failed to parse (%s)\n", published ) 
 		}
 		
+		if parsedTime.After( time.Now() ){
+			parsedTime = time.Now()
+		}
+		
 		//Thanks VGCats! You have no content! http://www.vgcats.com/vgcats.rdf.xml
 		//if content == "" {
 		//	panic(errors.New("Could not find content"))

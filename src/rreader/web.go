@@ -7,6 +7,7 @@ import (
 	"github.com/ziutek/mymysql/mysql"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -22,6 +23,7 @@ type FeedViewItem struct {
 	LastUpdate  int64
 	Group       string
 	Unread      int
+	Active 		int
 }
 
 type ChannelView struct {
@@ -56,7 +58,7 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	var userId uint32 = 1
-	rows, _, err := GetConnection().Query("SELECT `id`,`title`,`link`,`description`,`last_update`,`user_id`,`group`,`unread` FROM home_view WHERE user_id=%d", userId)
+	rows, _, err := GetConnection().Query("SELECT `id`,`title`,`link`,`description`,`last_update`,`user_id`,`group`,`unread`,`active` FROM home_view WHERE user_id=%d", userId)
 	
 	if err != nil {
 		respondError( w, err.Error() )
@@ -66,7 +68,7 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 	feeds := make([]FeedViewItem, len(rows))
 
 	for id, row := range rows {
-		feeds[id] = FeedViewItem{row.Int(0), row.Str(1), row.Str(2), row.Str(3), row.Time(4, time.Local).Unix(), row.Str(6), row.Int(7)}
+		feeds[id] = FeedViewItem{row.Int(0), row.Str(1), row.Str(2), row.Str(3), row.Time(4, time.Local).Unix(), row.Str(6), row.Int(7), row.Int(8)}
 	}
 
 	b, err := json.Marshal(HomeView{feeds})
@@ -81,32 +83,46 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 	//c.RespondWithData(HomeView{feeds})
 }
 
-func serveFeedItems(w http.ResponseWriter, r *http.Request) {
-	var userId uint32 = 1
-	searchQuery := fmt.Sprintf("userid=%d", userId)
-
+func getFeedsQueryFromForm(r *http.Request) (string, error) {
 	group := r.FormValue("group")
 	feed := r.FormValue("feed")
 	starred := r.FormValue("starred")
+
+	if group != "" {
+		return fmt.Sprintf("`group`='%s'", gConn.Escape(group)), nil
+	} else if feed != "" {
+		feedId, err := strconv.ParseInt(feed, 10, 64)
+
+		if err != nil {
+			return "", err
+		}
+
+		return fmt.Sprintf("`feedid`=%d", feedId), nil
+	} else if starred != "" {
+		return fmt.Sprintf("`label`='star'"), nil
+	}
+
+	return "", nil
+}
+
+func serveFeedItems(w http.ResponseWriter, r *http.Request) {
+	var userId uint32 = 1
+	searchQuery := fmt.Sprintf("userid=%d", userId)
 	start, err := strconv.ParseInt(r.FormValue("start"), 10, 64)
 
 	if err != nil {
 		start = 0
 	}
-
-	if group != "" {
-		searchQuery = fmt.Sprintf("%s AND `group`='%s'", searchQuery, gConn.Escape(group))
-	} else if feed != "" {
-		feedId, err := strconv.ParseInt(feed, 10, 64)
-
-		if err != nil {
-			respondError( w, err.Error() ) 
-			return
-		}
-
-		searchQuery = fmt.Sprintf("%s AND `feedid`=%d", searchQuery, feedId)
-	} else if starred != "" {
-		searchQuery = fmt.Sprintf("%s AND `label`='star'", searchQuery)
+	
+	extraSearch, err := getFeedsQueryFromForm(r)
+	
+	if err != nil {
+		respondError( w, err.Error() ) 
+		return
+	}
+	
+	if extraSearch != "" {
+		searchQuery = fmt.Sprintf("%s AND %s", searchQuery, extraSearch )
 	}
 
 	rows, _, err := GetConnection().Query("SELECT `id`,`title`,`published`,`updated`,`link`,`author`,`feedtitle`,`feedid`,`is_read`,`label` FROM `entrylist` WHERE %s ORDER BY `updated` DESC LIMIT %d,100", searchQuery, start)
@@ -291,6 +307,55 @@ func serveUpdateOrder(w http.ResponseWriter, r *http.Request) {
 	transaction.Commit()
 }
 
+func serveMarkRead(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(400)
+		fmt.Fprint(w, "Not a post request.")
+		return
+	}
+
+	var userId uint32 = 1
+	
+	decoder := json.NewDecoder(r.Body)
+	var readFeedsIds []int
+
+	err := decoder.Decode(&readFeedsIds)
+	if err != nil {
+		respondError( w, err.Error() ) 
+		return
+	}
+	
+	if len(readFeedsIds) == 0 {
+		respondError( w, "The array of feeds to mark as read is empty." ) 
+		return
+	}
+	
+	readFeeds := []string {}
+	for _, id := range(readFeedsIds) {
+		readFeeds = append(readFeeds, strconv.Itoa( id ) )
+	}
+
+	_, _, err = gConn.Query("UPDATE `user_feed` SET `newest_read`=NOW(), `unread_items`=0  WHERE user_id=%d AND feed_id IN (%s)",
+			userId,
+			strings.Join( readFeeds, "," ) )
+			
+	if err != nil {
+		respondError( w, err.Error() ) 
+		return
+	}
+	
+	_, _, err = gConn.Query("DELETE `user_feed_readitems` FROM `user_feed_readitems` INNER JOIN `feed_entry` ON `user_feed_readitems`.`entry_id` = `feed_entry`.`id` WHERE user_feed_readitems.`user_id`=%d AND `feed_entry`.`feed_id` IN (%s)",
+			userId,
+			strings.Join( readFeeds, "," ) )
+			
+	if err != nil {
+		respondError( w, err.Error() ) 
+		return
+	}
+	
+	fmt.Fprint(w, "{\"success\":1}")
+}
+
 func StartWebserver() {
 
 	http.HandleFunc("/home", serveHome )
@@ -298,6 +363,7 @@ func StartWebserver() {
 	http.HandleFunc("/item", serveGetItem )
 	http.HandleFunc("/updateLabels", serveUpdateItemLabels )
 	http.HandleFunc("/updateOrder", serveUpdateOrder )
+	http.HandleFunc("/markRead", serveMarkRead )
 	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("web"))) )
 
 	http.ListenAndServe(":8080", nil)

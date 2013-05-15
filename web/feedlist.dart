@@ -1,5 +1,69 @@
 part of RabbitReader;
 
+class FeedList extends ui.DockLayoutPanel {
+  
+  Title title = new Title();
+  FeedEntryListWidget entries = new FeedEntryListWidget();
+  
+  FeedList() : super(util.Unit.PX) {
+    addNorth(title, 28.0);
+    add(entries);
+    
+    getElement().style.position = "absolute";
+    getElement().style.top = "0px";
+    getElement().style.bottom = "0px";
+    getElement().style.right = "0px";
+    getElement().style.left = "0px";
+    
+    title.onRefresh.listen(this.onRefresh);
+    title.onMarkRead.listen(this.onMarkRead);
+  }
+  
+  void setFeedProdiver(FeedEntryProvier provider){
+    entries.setFeedProdiver(provider);
+  }
+  
+  void reloadList(){
+    entries.reset();
+    entries.loadPage();
+  }
+  
+  void onRefresh(MouseEvent e){
+    this.reloadList();
+  }
+  
+  void onMarkRead(MouseEvent e){
+    entries.provider.markRead().then((bool val){
+    
+      entries.getEntries().forEach((FeedEntryListItemWidget e){
+        e.item.markAsRead();
+        e.update();
+      });
+      
+    }, onError: (err){
+      window.alert(err);
+    });
+  }
+  
+  
+  
+}
+
+class Title extends ui.FlowPanel {
+  
+  ui.Button refresh = new ui.Button("Refresh");
+  ui.Button markRead = new ui.Button("Mark all as read");
+  
+  Title(){
+    add(refresh);
+    add(markRead);
+  }
+  
+  Stream<MouseEvent> get onRefresh => refresh.getElement().onClick;
+  Stream<MouseEvent> get onMarkRead => markRead.getElement().onClick;
+  
+}
+
 class FeedEntryListWidget extends ui.FlowPanel{
   FeedEntryProvier provider;
   
@@ -13,11 +77,15 @@ class FeedEntryListWidget extends ui.FlowPanel{
     getElement().onScroll.listen(this.onScroll);
   }
   
-  void setFeedProdiver(FeedEntryProvier provider){
-    this.provider = provider;
+  void reset(){
     this.hasMore = true;
     this.clear();
     currentPage = 0;
+  }
+  
+  void setFeedProdiver(FeedEntryProvier provider){
+    reset();
+    this.provider = provider;
     loadPage();
   }
   
@@ -35,9 +103,13 @@ class FeedEntryListWidget extends ui.FlowPanel{
     if( feedItems.length == 0 )
       this.hasMore = false;
     
-    feedItems.map((feed){
-      return new FeedEntryListItemWidget(feed);
-    }).forEach(this.add);
+    feedItems.forEach((FeedEntry feed){
+      if(getWidgetByEntryId(feed.id) != null )
+        return;
+      
+      var widget = new FeedEntryListItemWidget(feed);
+      this.add(widget);
+    } );
     
   }
   
@@ -55,6 +127,24 @@ class FeedEntryListWidget extends ui.FlowPanel{
     }
   }
   
+  List<FeedEntryListItemWidget> getEntries(){
+    List<FeedEntryListItemWidget> feeds = new List();
+    
+    for( ui.Widget widget in this.getChildren() ){     
+      if( widget is FeedEntryListItemWidget )
+        feeds.add(widget);
+    }
+    
+    return feeds;
+  }
+  
+  FeedEntryListItemWidget getWidgetByEntryId(int id){
+    for( FeedEntryListItemWidget widget in this.getEntries() ){      
+      if(widget.item.id == id)
+        return widget;
+    }
+    return null;
+  }
 }
 
 class FeedEntryListItemWidget extends ui.FlowPanel{
@@ -162,7 +252,8 @@ class FeedEntryContentWidget extends ui.FlowPanel {
   
   ui.Anchor title = new ui.Anchor();
   ui.Label author = new ui.Label();
-  ui.HtmlPanel content = new ui.HtmlPanel("");
+  //ui.HtmlPanel content = new ui.HtmlPanel("");
+  IFrameElement content2 = new IFrameElement();
   
   FeedEntryContentWidget(this.entry){
     setStylePrimaryName("feed-content");
@@ -175,6 +266,12 @@ class FeedEntryContentWidget extends ui.FlowPanel {
     title.target = "_blank";
     title.href = entry.link;
     
+    content2.sandbox = "";
+    content2.seamless = true;
+    content2.srcdoc = entry.content;
+    //content2.contentWindow.document.body.innerHtml = entry.content;
+    
+    /*
     content.setStylePrimaryName("feed-content-body");
     content.getElement().innerHtml =  entry.content; 
     content.getElement().queryAll("img").forEach((ImageElement elem){
@@ -190,10 +287,14 @@ class FeedEntryContentWidget extends ui.FlowPanel {
     content.getElement().queryAll("a").forEach((anchor){
       anchor.target = "_blank";
     });
+    */
     
     add(title);
     add(author);
-    add(content);
+    //add(content);
+    getElement().append(content2);
   }
   
+  void onLoad(){
+  }
 }

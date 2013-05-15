@@ -17,39 +17,6 @@ type SQLImporter struct {
 	entryIds []string
 }
 
-/*
-func (self SQLImporter) getGroup(group string) uint32 {
-	groupId, present := self.groupIds[group]
-	
-	if present {
-		return groupId
-	}
-
-	rows, _, err := self.transaction.Query("SELECT `group_id` FROM `feedgroup` WHERE `title`='%s' AND user_id=%d", group, self.userId)
-		
-	if err != nil {
-		panic(err)
-	}
-	
-	if len(rows) == 0 {
-		_, res, err := self.transaction.Query("INSERT INTO `feedgroup`(`user_id`,`title`) VALUES (%d,'%s')",
-			self.userId,
-			group)
-			
-		if err != nil {
-			panic(err)
-		}
-		
-		groupId = uint32(res.InsertId())
-	} else {
-		groupId = uint32(rows[0].Int(0))
-	}
-	
-	self.groupIds[group] = groupId
-	
-	return groupId
-}
-*/
 func (self SQLImporter) OnSubscription(feed *Subscription, group string) {
 
 	rows, res, err := self.transaction.Query("SELECT `id` FROM `feed` WHERE `feedURL`='%s'", feed.XmlUrl)
@@ -87,21 +54,6 @@ func (self SQLImporter) OnSubscription(feed *Subscription, group string) {
 	if err != nil {
 		panic(err)
 	}	
-	
-	/*
-	if group != "" {
-		groupId := self.getGroup(group)
-		
-		_, _, err = self.transaction.Query("INSERT INTO `feedgroup_item`(`feedgroup_id`,`feed_id`) VALUES (%d,%d)",
-				groupId,
-				feedId )
-	
-		if err != nil {
-			panic(err)
-		}
-		
-	}
-	*/
 	
 }
 
@@ -151,6 +103,15 @@ func (self SQLImporter) ReadFeedItem(item FeedItem) uint64 {
 			}
 	
 			feedId = uint32(res.InsertId())
+			
+			_, res, err = self.transaction.Query("INSERT IGNORE INTO `user_feed`(`user_id`,`feed_id`,`newest_read`,`unread_items`,`active`) VALUES (%d, %d, '%s',0,0)",
+				self.userId, 
+				feedId, 
+				time.Now() )
+				
+			if err != nil {
+				panic(err)
+			}	
 		}
 		
 		//Update the feedId for future objects
