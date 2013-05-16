@@ -142,7 +142,6 @@ class FeedEntryProvier {
     Completer completer = new Completer();
     
     List feedIds = feeds.map((Feed feed){ return feed.id; }).toList();
-    print(feedIds);
     String jsonData = stringify(feedIds);
     
     HttpRequest.request("/markRead", method: "POST", sendData: jsonData).then((HttpRequest request){
@@ -167,7 +166,7 @@ class FeedEntryGroupProvier extends FeedEntryProvier{
   
   Future<bool> markRead(){
     return _markRead(reader.feeds.where(
-        (Feed feed){ return feed.group == group; }));
+        (Feed feed){ return feed.group == group; }).toList());
   }
 }
 

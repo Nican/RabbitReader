@@ -41,7 +41,7 @@ class FeedList extends ui.DockLayoutPanel {
       });
       
     }, onError: (err){
-      window.alert(err);
+      window.alert(err.toString());
     });
   }
   
@@ -252,8 +252,8 @@ class FeedEntryContentWidget extends ui.FlowPanel {
   
   ui.Anchor title = new ui.Anchor();
   ui.Label author = new ui.Label();
-  //ui.HtmlPanel content = new ui.HtmlPanel("");
-  IFrameElement content2 = new IFrameElement();
+  ui.HtmlPanel content = new ui.HtmlPanel("");
+  //IFrameElement content2 = new IFrameElement();
   
   FeedEntryContentWidget(this.entry){
     setStylePrimaryName("feed-content");
@@ -266,12 +266,10 @@ class FeedEntryContentWidget extends ui.FlowPanel {
     title.target = "_blank";
     title.href = entry.link;
     
-    content2.sandbox = "";
-    content2.seamless = true;
-    content2.srcdoc = entry.content;
-    //content2.contentWindow.document.body.innerHtml = entry.content;
+    //content2.sandbox = "";
+    //content2.seamless = true;
+    //content2.srcdoc = entry.content;
     
-    /*
     content.setStylePrimaryName("feed-content-body");
     content.getElement().innerHtml =  entry.content; 
     content.getElement().queryAll("img").forEach((ImageElement elem){
@@ -287,12 +285,12 @@ class FeedEntryContentWidget extends ui.FlowPanel {
     content.getElement().queryAll("a").forEach((anchor){
       anchor.target = "_blank";
     });
-    */
+    
     
     add(title);
     add(author);
-    //add(content);
-    getElement().append(content2);
+    add(content);
+    //getElement().append(content2);
   }
   
   void onLoad(){

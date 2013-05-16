@@ -4,6 +4,7 @@ import "fmt"
 import "rreader"
 import "os"
 import "time"
+import "io/ioutil"
 
 type User struct {
 	id   uint32
@@ -25,8 +26,20 @@ func CreateUser(username string) User {
 }
 
 func importData(fileName string) {
+	sql, err := ioutil.ReadFile("mysql.sql")
+	
+	if err != nil {
+		panic(err)
+	} 
+	
+	_, _, err = rreader.GetConnection().Query(string(sql))
+	
+	if err != nil {
+		panic(err)
+	}
+
 	CreateUser("nican")
-	err := rreader.SQLImport(1, fileName)
+	err = rreader.SQLImport(1, fileName)
 
 	if err != nil {
 		panic(err)

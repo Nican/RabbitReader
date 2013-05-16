@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type HomeView struct {
@@ -68,7 +67,7 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 	feeds := make([]FeedViewItem, len(rows))
 
 	for id, row := range rows {
-		feeds[id] = FeedViewItem{row.Int(0), row.Str(1), row.Str(2), row.Str(3), row.Time(4, time.Local).Unix(), row.Str(6), row.Int(7), row.Int(8)}
+		feeds[id] = FeedViewItem{row.Int(0), row.Str(1), row.Str(2), row.Str(3), row.Int64(4), row.Str(6), row.Int(7), row.Int(8)}
 	}
 
 	b, err := json.Marshal(HomeView{feeds})
@@ -135,8 +134,7 @@ func serveFeedItems(w http.ResponseWriter, r *http.Request) {
 	feeds := make([]ChannelViewItem, len(rows))
 
 	for id, row := range rows {
-		updated := row.Time(3, time.Local).Unix()
-		feeds[id] = ChannelViewItem{row.Int(0), row.Str(1), row.Str(2), updated, row.Str(4), row.Str(5), row.Str(6), row.Int(7), row.Int(8), row.Str(9) }
+		feeds[id] = ChannelViewItem{row.Int(0), row.Str(1), row.Str(2), row.Int64(3), row.Str(4), row.Str(5), row.Str(6), row.Int(7), row.Int(8), row.Str(9) }
 	}
 
 	b, err := json.Marshal(ChannelView{feeds})

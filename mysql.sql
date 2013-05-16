@@ -8,6 +8,8 @@ USE `rreader` ;
 -- -----------------------------------------------------
 -- Table `rreader`.`feed`
 -- -----------------------------------------------------
+DROP TABLE IF EXISTS `rreader`.`feed` ;
+
 CREATE  TABLE IF NOT EXISTS `rreader`.`feed` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT ,
   `title` VARCHAR(64) NOT NULL ,
@@ -24,6 +26,8 @@ ENGINE = InnoDB;
 -- -----------------------------------------------------
 -- Table `rreader`.`feed_entry`
 -- -----------------------------------------------------
+DROP TABLE IF EXISTS `rreader`.`feed_entry` ;
+
 CREATE  TABLE IF NOT EXISTS `rreader`.`feed_entry` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT ,
   `feed_id` INT UNSIGNED NOT NULL ,
@@ -48,6 +52,8 @@ ENGINE = InnoDB;
 -- -----------------------------------------------------
 -- Table `rreader`.`users`
 -- -----------------------------------------------------
+DROP TABLE IF EXISTS `rreader`.`users` ;
+
 CREATE  TABLE IF NOT EXISTS `rreader`.`users` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT ,
   `name` VARCHAR(45) NULL ,
@@ -60,6 +66,8 @@ ENGINE = InnoDB;
 -- -----------------------------------------------------
 -- Table `rreader`.`user_feed`
 -- -----------------------------------------------------
+DROP TABLE IF EXISTS `rreader`.`user_feed` ;
+
 CREATE  TABLE IF NOT EXISTS `rreader`.`user_feed` (
   `user_id` INT UNSIGNED NOT NULL ,
   `feed_id` INT UNSIGNED NOT NULL ,
@@ -89,6 +97,8 @@ ENGINE = InnoDB;
 -- -----------------------------------------------------
 -- Table `rreader`.`user_feed_readitems`
 -- -----------------------------------------------------
+DROP TABLE IF EXISTS `rreader`.`user_feed_readitems` ;
+
 CREATE  TABLE IF NOT EXISTS `rreader`.`user_feed_readitems` (
   `user_id` INT UNSIGNED NOT NULL ,
   `entry_id` INT UNSIGNED NOT NULL ,
@@ -111,6 +121,8 @@ ENGINE = InnoDB;
 -- -----------------------------------------------------
 -- Table `rreader`.`user_entry_label`
 -- -----------------------------------------------------
+DROP TABLE IF EXISTS `rreader`.`user_entry_label` ;
+
 CREATE  TABLE IF NOT EXISTS `rreader`.`user_entry_label` (
   `user_id` INT UNSIGNED NOT NULL ,
   `feed_entry_id` INT UNSIGNED NOT NULL ,
@@ -151,6 +163,9 @@ CREATE TABLE IF NOT EXISTS `rreader`.`unread_view` (`feed_id` INT, `user_id` INT
 -- procedure update_unread
 -- -----------------------------------------------------
 
+USE `rreader`;
+DROP procedure IF EXISTS `rreader`.`update_unread`;
+
 DELIMITER $$
 USE `rreader`$$
 CREATE PROCEDURE `rreader`.`update_unread` ()
@@ -165,6 +180,7 @@ DELIMITER ;
 -- -----------------------------------------------------
 -- View `rreader`.`entrylist`
 -- -----------------------------------------------------
+DROP VIEW IF EXISTS `rreader`.`entrylist` ;
 DROP TABLE IF EXISTS `rreader`.`entrylist`;
 USE `rreader`;
 CREATE  OR REPLACE VIEW `rreader`.`entrylist` AS
@@ -185,6 +201,7 @@ LEFT JOIN `user_entry_label` ON
 -- -----------------------------------------------------
 -- View `rreader`.`home_view`
 -- -----------------------------------------------------
+DROP VIEW IF EXISTS `rreader`.`home_view` ;
 DROP TABLE IF EXISTS `rreader`.`home_view`;
 USE `rreader`;
 CREATE  OR REPLACE VIEW `rreader`.`home_view` AS
@@ -198,6 +215,7 @@ ORDER BY user_feed.priority, feed.title
 -- -----------------------------------------------------
 -- View `rreader`.`unread_view`
 -- -----------------------------------------------------
+DROP VIEW IF EXISTS `rreader`.`unread_view` ;
 DROP TABLE IF EXISTS `rreader`.`unread_view`;
 USE `rreader`;
 CREATE  OR REPLACE VIEW `rreader`.`unread_view` AS

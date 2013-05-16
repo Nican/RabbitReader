@@ -13,11 +13,12 @@ import (
 
 var gUpdateMutex sync.Mutex;
 
-func UpdateFeeds(age int) error {
+func UpdateFeeds(age int64) error {
 	gUpdateMutex.Lock()
 	defer gUpdateMutex.Unlock()
 	
-	rows, _, err := GetConnection().Query("SELECT `id`,`feedURL` FROM `feed` WHERE `last_update` < DATE_SUB(now(), INTERVAL %d MINUTE) AND `disabled`=0", age )
+	rows, _, err := GetConnection().Query("SELECT `id`,`feedURL` FROM `feed` WHERE `last_update` < %d AND `disabled`=0",
+		time.Now().Unix() - age * 60 )
 	
 	if err != nil {
 		return err
@@ -210,7 +211,7 @@ func updateFeed( feedId int, uri string ) (retErr error ) {
         conn.Close()
     }()
     
-    _, _, err = transaction.Query("UPDATE `feed` SET `last_update`=now() WHERE `id`=%d", feedId)
+    _, _, err = transaction.Query("UPDATE `feed` SET `last_update`=%d WHERE `id`=%d", time.Now().Unix(), feedId)
 	
 	if err != nil {
 		panic(err)
@@ -277,11 +278,11 @@ func updateFeed( feedId int, uri string ) (retErr error ) {
 		guid := getGUID(node)
 		title := node.S(ns, "title")
 		published := node.S(ns, "pubDate")
-		parsedTime, err := parseTime(published)
-	
 		if len( published ) == 0 {
 			published = node.S(ns, "published")
 		}
+		
+		parsedTime, err := parseTime(published)
 		
 		if err != nil {
 			fmt.Printf("Warning: Failed to parse (%s)\n", published ) 
@@ -300,12 +301,12 @@ func updateFeed( feedId int, uri string ) (retErr error ) {
 			return
 		}
 		
-		_, _, err = transaction.Query("INSERT INTO `feed_entry`(`feed_id`,`title`,`content`,`published`,`updated`,`author`,`link`,`guid`) VALUES (%d,'%s','%s','%s','%s','%s','%s','%s')", 
+		_, _, err = transaction.Query("INSERT INTO `feed_entry`(`feed_id`,`title`,`content`,`published`,`updated`,`author`,`link`,`guid`) VALUES (%d,'%s','%s','%s',%d,'%s','%s','%s')", 
 			feedId,
 			gConn.Escape(title),
 			gConn.Escape(content),
 			gConn.Escape(published),
-			parsedTime,
+			parsedTime.Unix(),
 			gConn.Escape(author),
 			gConn.Escape(link),
 			gConn.Escape(guid))

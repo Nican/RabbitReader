@@ -3,12 +3,15 @@ part of RabbitReader;
 class Menu extends ui.FlowPanel{
   FeedTreeWidget feedTree = new FeedTreeWidget();  
   ui.Label home = new ui.Label("Home");
-  ui.Label starred = new ui.Label("Starred");
+  ui.Label starred = new ui.Label("★ Starred");
   
   Menu(){
+    home.setStylePrimaryName("scroll-tree-home");
+    starred.setStylePrimaryName("scroll-tree-starred");
+    
     add(home);
     add(starred);
-
+    getElement().append(new HRElement());
     add(feedTree);
     
     home.getElement().onClick.listen(this.displayHome);
@@ -45,7 +48,13 @@ class TreeLabel extends ui.FlowPanel implements event.HasClickHandlers {
   
   void set unread(int val) {
     unreadLabel.visible = val > 0;
-    unreadLabel.text = "(" + val.toString() + ")";
+    unreadLabel.text = " (" + val.toString() + ")";
+    
+    titleLabel.getElement().style.fontWeight = val > 0 ? "bold" : "";
+  }
+  
+  void set selected(bool val) {
+    titleLabel.getElement().style.color = val ? "rgb(209, 72, 54)" : "";  
   }
   
   event.HandlerRegistration addClickHandler(event.ClickHandler handler) {
@@ -54,6 +63,7 @@ class TreeLabel extends ui.FlowPanel implements event.HasClickHandlers {
 }
 
 abstract class SortableTreeItem extends ui.TreeItem  {
+  static TreeLabel lastSelectedLabel = null;
   
   static SortableTreeItem startDrag; 
   static Element lastDragged = null;
@@ -170,7 +180,12 @@ abstract class SortableTreeItem extends ui.TreeItem  {
   }
   
   void onClick(event.ClickEvent event){
+    if( lastSelectedLabel != null )
+      lastSelectedLabel.selected = false;
+    
     reader.setFeedProdiver(getProvider());
+    label.selected = true;
+    lastSelectedLabel = label;
   }
   
   FeedEntryProvier getProvider();

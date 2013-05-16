@@ -44,10 +44,10 @@ func (self SQLImporter) OnSubscription(feed *Subscription, group string) {
 	feedId := uint32(res.InsertId())
 	self.feedIds[feed.XmlUrl] = feedId
 	
-	_, res, err = self.transaction.Query("INSERT IGNORE INTO `user_feed`(`user_id`,`feed_id`,`newest_read`,`unread_items`,`group`) VALUES (%d, %d, '%s', %d,'%s')",
+	_, res, err = self.transaction.Query("INSERT IGNORE INTO `user_feed`(`user_id`,`feed_id`,`newest_read`,`unread_items`,`group`) VALUES (%d, %d, %d, %d,'%s')",
 		self.userId, 
 		feedId, 
-		time.Now(), 
+		time.Now().Unix(), 
 		0,
 		gConn.Escape(group) )
 		
@@ -91,11 +91,11 @@ func (self SQLImporter) ReadFeedItem(item FeedItem) uint64 {
 			feedId = uint32(rows[0].Uint(0))
 		} else {
 	
-			_, res, err := self.transaction.Query("INSERT INTO `feed`(`title`,`description`,`link`,`last_update`,`feedURL`,`disabled`) VALUES ('%s','%s','%s','%s','%s',1)",
+			_, res, err := self.transaction.Query("INSERT INTO `feed`(`title`,`description`,`link`,`last_update`,`feedURL`,`disabled`) VALUES ('%s','%s','%s',%d,'%s',1)",
 				"",
 				"",
 				feedUrl,
-				"0",
+				0,
 				feedUrl)
 	
 			if err != nil {
@@ -104,10 +104,10 @@ func (self SQLImporter) ReadFeedItem(item FeedItem) uint64 {
 	
 			feedId = uint32(res.InsertId())
 			
-			_, res, err = self.transaction.Query("INSERT IGNORE INTO `user_feed`(`user_id`,`feed_id`,`newest_read`,`unread_items`,`active`) VALUES (%d, %d, '%s',0,0)",
+			_, res, err = self.transaction.Query("INSERT IGNORE INTO `user_feed`(`user_id`,`feed_id`,`newest_read`,`unread_items`,`active`) VALUES (%d, %d, %d,0,0)",
 				self.userId, 
 				feedId, 
-				time.Now() )
+				time.Now().Unix() )
 				
 			if err != nil {
 				panic(err)
@@ -124,13 +124,13 @@ func (self SQLImporter) ReadFeedItem(item FeedItem) uint64 {
 		content = item.Content.Content
 	}
 	
-	_, res, err := self.transaction.Query("INSERT IGNORE INTO `feed_entry`(`feed_id`,`title`,`content`,`link`,`published`,`updated`,`author`,`guid`) VALUES (%d,'%s','%s','%s','%s','%s','%s','%s')",
+	_, res, err := self.transaction.Query("INSERT IGNORE INTO `feed_entry`(`feed_id`,`title`,`content`,`link`,`published`,`updated`,`author`,`guid`) VALUES (%d,'%s','%s','%s',%d,%d,'%s','%s')",
 		feedId,
 		gConn.Escape(item.Title),
 		gConn.Escape(content),
 		gConn.Escape( item.Alternate[0].Href ),
-		time.Unix( int64(item.Published), 0 ),
-		time.Unix( int64(item.Updated), 0 ),
+		int64(item.Published),
+		int64(item.Updated),
 		gConn.Escape( item.Author ),
 		gConn.Escape( item.Id ) )
 	

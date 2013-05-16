@@ -22,6 +22,15 @@ h1, p {
   cursor: pointer;
 }
 
+.scroll-tree-home 
+{
+  margin: 6px 0px 6px 19px;
+}
+
+.scroll-tree-starred {
+  margin: 0px 0px 0px 19px;
+}
+
 .scroll-tree-item-title
 {
   max-width: 132px;
@@ -42,7 +51,7 @@ h1, p {
   height: 21px;
   font-size: 11px;
   width: 26px;
-  margin: 0px 1px 0px 0px;
+  margin: 0px 0px 0px 3px;
   padding: 0px 0px 0px 1px;
   text-align: left;
   display: inline-block;
