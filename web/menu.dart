@@ -4,11 +4,13 @@ class Menu extends ui.FlowPanel{
   FeedTreeWidget feedTree = new FeedTreeWidget();  
   ui.Label home = new ui.Label("Home");
   ui.Label starred = new ui.Label("★ Starred");
+  AddFeedButton addFeed = new AddFeedButton();
   
   Menu(){
     home.setStylePrimaryName("scroll-tree-home");
     starred.setStylePrimaryName("scroll-tree-starred");
     
+    add(addFeed);
     add(home);
     add(starred);
     getElement().append(new HRElement());
@@ -27,6 +29,68 @@ class Menu extends ui.FlowPanel{
   }
   
   
+}
+
+class AddFeedButton extends ui.Button implements event.ClickHandler {
+  
+  AddFeedButton() : super ("ADD"){
+    addClickHandler(this);
+  }
+  
+  void onClick(event.ClickEvent event){
+    FeedPopup popup = new FeedPopup();
+    popup.show();
+    popup.position( this, 100, 100 );    
+  }
+}
+
+class FeedPopup extends ui.PopupPanel implements event.ClickHandler {
+  
+  ui.TextBox box = new ui.TextBox();
+  ui.Button addButton = new ui.Button("ADD");
+  ui.FlowPanel body = new ui.FlowPanel();
+  
+  FeedPopup() : super(true,true){
+    getElement().style
+      ..backgroundColor = "white"
+      ..border = "1px solid black";
+    
+    add(body);
+    
+    body.add(new ui.Label("Enter feed url:"));
+    body.add(box);
+    body.add(addButton);
+    
+    addButton.addClickHandler(this);
+  }
+  
+  void onClick(event.ClickEvent event){
+    box.enabled = false;
+    addButton.enabled = false;
+    body.add(new ui.Label("Loading..."));
+    
+    String jsonData = stringify({"uri": box.getValue()});    
+    HttpRequest request = new HttpRequest(); // create a new XHR
+    request.open("POST", "/add");
+    request.setRequestHeader("Content-Type", "application/json");
+    request.send(jsonData);
+    
+    request.onLoad.listen((e) {
+      // Note: file:// URIs have status of 0.
+      if ((request.status >= 200 && request.status < 300) ||
+          request.status == 0 || request.status == 304) {
+        reader.updateFeeds(); 
+      } else {
+        window.alert( request.responseText );
+      }
+      this.hide(true);
+    });
+
+    request.onError.listen((e) {
+      window.alert( e.toString() );
+    });
+    
+  }
 }
 
 class TreeLabel extends ui.FlowPanel implements event.HasClickHandlers {
@@ -88,7 +152,7 @@ abstract class SortableTreeItem extends ui.TreeItem  {
     
     label.addClickHandler(this);
     updateTitle();
-  }
+  } 
   
   void updateTitle(){
     label.text = getTitle(); 

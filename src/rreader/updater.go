@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 	"github.com/jteeuwen/go-pkg-xmlx"
+	"github.com/ziutek/mymysql/mysql"
 	"net/http"
 	"errors"
 	"time"
@@ -13,11 +14,20 @@ import (
 
 var gUpdateMutex sync.Mutex;
 
+//Updates all feeds that have not been updates in the past "age" minutes.
 func UpdateFeeds(age int64) error {
 	gUpdateMutex.Lock()
 	defer gUpdateMutex.Unlock()
+
+	conn := GetConnection().Clone()
+
+	if err := conn.Connect(); err != nil {
+		return err
+	}
+
+	defer conn.Close()
 	
-	rows, _, err := GetConnection().Query("SELECT `id`,`feedURL` FROM `feed` WHERE `last_update` < %d AND `disabled`=0",
+	rows, _, err := conn.Query("SELECT `id`,`feedURL` FROM `feed` WHERE `last_update` < %d AND `disabled`=0",
 		time.Now().Unix() - age * 60 )
 	
 	if err != nil {
@@ -26,8 +36,8 @@ func UpdateFeeds(age int64) error {
 	
 	waitGroup := new (sync.WaitGroup)
 	
-	update := func( feedId int, uri string ){		
-		err := updateFeed( feedId, uri )
+	update := func( feedId uint64, uri string ){	
+		err := UpdateFeed( feedId, uri )
 		
 		fmt.Printf("Reading feed (%d): %s\n", feedId, uri )
 		if err != nil {
@@ -41,12 +51,12 @@ func UpdateFeeds(age int64) error {
 	//We can "go" this loop, but the mysql module does not like having concurrent transactions
 	for _, feed := range rows {
 		waitGroup.Add(1)
-		go update( feed.Int(0), feed.Str(1) )
+		go update( feed.Uint64(0), feed.Str(1) )
 	}
 	
 	waitGroup.Wait()
 	
-	_, _, err = GetConnection().QueryFirst("CALL update_unread()")
+	_, _, err = conn.QueryFirst("CALL update_unread()")
 
 	if err != nil {
 		return err
@@ -186,42 +196,119 @@ func findItems(node *xmlx.Node, callback onItem){
 	for _ , child := range node.Children {
 		findItems(child, callback)
 	}
-} 
+}
 
-func updateFeed( feedId int, uri string ) (retErr error ) {
+func AddFeed( transaction mysql.Transaction, uri string ) (uint64,error) {
+	doc := xmlx.New()
+
+	if err := doc.LoadUriClient(uri, http.DefaultClient, CharsetReader); err != nil {
+		return 0, errors.New("Unable to load URI: " + uri)
+	}
 	
-	const ns = "*"
-	conn := gConn.Clone()
+	getTitle := func() string {
+		title := doc.Root.S("*", "title")
+		
+		if title == "" {
+			title = doc.SelectNode("*", "channel").S("*", "title")
+		}
+		return title
+	}
+	
+	getDescription := func() string {
+		description := doc.Root.S("*", "subtitle")
+		
+		if description == "" {
+			description = doc.SelectNode("*", "channel").S("*", "description")
+		}
+		return description
+	}
+	
+	getLink := func() string {
+		link := ""
+		
+		for _, node := range doc.SelectNodes("*", "link") {
+			if node.As("", "rel") == "alternate" {
+				link = node.As("", "href")
+			}
+		}
+		
+		if link == "" {
+			link = doc.SelectNode("*", "channel").S("*", "link") 
+		}
+		
+		return link
+	}
+
+	_, res, err := transaction.Query("INSERT INTO `feed`(`title`,`description`,`link`,`last_update`,`feedURL`) VALUES ('%s','%s','%s',0,'%s')",
+		getTitle(),
+		getDescription(),
+		getLink(),
+		uri )
+
+	if err != nil {
+		return 0, err
+	}
+
+	feedId := res.InsertId()
+
+	if err := UpdateFeedDocument( transaction, feedId, doc ); err != nil {
+		return 0, err
+	}
+
+	return feedId, nil
+}
+
+//Creates a new transaction and updates the feed
+func UpdateFeed(feedId uint64, uri string ) (retErr error ){
+	conn := GetConnection().Clone()
+		
 	if err := conn.Connect(); err != nil {
 		return err
+	}
+	defer conn.Close()
+	
+	 _, _, err := conn.Query("UPDATE `feed` SET `last_update`=%d WHERE `id`=%d", time.Now().Unix(), feedId)
+	
+	if err != nil {
+		panic(err)
 	}
 	
 	transaction, err := conn.Begin()
 	if err != nil {
 		return err
 	}
+
+    if err = UpdateFeedTransaction( transaction, feedId, uri ); err != nil {
+    	transaction.Rollback()
+    	return err
+    } else {
+    	transaction.Commit()
+    }
+
+    return nil
+}
+
+func UpdateFeedTransaction( transaction mysql.Transaction, feedId uint64, uri string ) (retErr error ) {
+
+	doc := xmlx.New()
+
+	if err := doc.LoadUriClient(uri, http.DefaultClient, CharsetReader); err != nil {
+		return err
+	}
+
+	return UpdateFeedDocument( transaction, feedId, doc )
+
+}
+
+func UpdateFeedDocument( transaction mysql.Transaction, feedId uint64, doc *xmlx.Document ) (retErr error ) {
 	
 	defer func() {
         if e := recover(); e != nil {
-            transaction.Rollback()
             retErr = e.(error)
-        } else {
-        	transaction.Commit()
         }
-        conn.Close()
     }()
-    
-    _, _, err = transaction.Query("UPDATE `feed` SET `last_update`=%d WHERE `id`=%d", time.Now().Unix(), feedId)
-	
-	if err != nil {
-		panic(err)
-	}
-    
-    doc := xmlx.New()
 
-	if err = doc.LoadUriClient(uri, http.DefaultClient, CharsetReader); err != nil {
-		return err
-	}
+	const ns = "*"
 	
 	findFeedEntry := func( title string, content string, date string, guid string ) bool {
 		search := ""

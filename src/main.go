@@ -12,7 +12,6 @@ type User struct {
 }
 
 func CreateUser(username string) User {
-
 	_, res, err := rreader.GetConnection().Query("INSERT INTO `users`(`name`) VALUES ('%s')", username)
 
 	if err != nil {
@@ -31,15 +30,17 @@ func importData(fileName string) {
 	if err != nil {
 		panic(err)
 	} 
-	
+
 	_, _, err = rreader.GetConnection().Query(string(sql))
 	
 	if err != nil {
 		panic(err)
 	}
 
-	CreateUser("nican")
-	err = rreader.SQLImport(1, fileName)
+	fmt.Println("Finished creating database.")
+
+	user := CreateUser("nican")
+	err = rreader.SQLImport(user.id, fileName)
 
 	if err != nil {
 		panic(err)

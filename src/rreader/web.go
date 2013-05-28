@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type HomeView struct {
@@ -55,9 +56,18 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 	if r.FormValue("update") != "" {
 		UpdateFeeds(60)
 	}
+
+	conn := GetConnection().Clone()
+
+	if err := conn.Connect(); err != nil {
+		respondError( w, err.Error() )
+		return
+	}
+
+	defer conn.Close()
 	
 	var userId uint32 = 1
-	rows, _, err := GetConnection().Query("SELECT `id`,`title`,`link`,`description`,`last_update`,`user_id`,`group`,`unread`,`active` FROM home_view WHERE user_id=%d", userId)
+	rows, _, err := conn.Query("SELECT `id`,`title`,`link`,`description`,`last_update`,`user_id`,`group`,`unread`,`active` FROM home_view WHERE user_id=%d", userId)
 	
 	if err != nil {
 		respondError( w, err.Error() )
@@ -124,7 +134,16 @@ func serveFeedItems(w http.ResponseWriter, r *http.Request) {
 		searchQuery = fmt.Sprintf("%s AND %s", searchQuery, extraSearch )
 	}
 
-	rows, _, err := GetConnection().Query("SELECT `id`,`title`,`published`,`updated`,`link`,`author`,`feedtitle`,`feedid`,`is_read`,`label` FROM `entrylist` WHERE %s ORDER BY `updated` DESC LIMIT %d,100", searchQuery, start)
+	conn := GetConnection().Clone()
+
+	if err := conn.Connect(); err != nil {
+		respondError( w, err.Error() )
+		return
+	}
+
+	defer conn.Close()
+
+	rows, _, err := conn.Query("SELECT `id`,`title`,`published`,`updated`,`link`,`author`,`feedtitle`,`feedid`,`is_read`,`label` FROM `entrylist` WHERE %s ORDER BY `updated` DESC LIMIT %d,100", searchQuery, start)
 
 	if err != nil {
 		respondError( w, err.Error() ) 
@@ -163,7 +182,16 @@ func serveGetItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, _, err := GetConnection().Query("SELECT `content` FROM `feed_entry` WHERE id=%d", id)
+	conn := GetConnection().Clone()
+
+	if err := conn.Connect(); err != nil {
+		respondError( w, err.Error() )
+		return
+	}
+
+	defer conn.Close()
+
+	rows, _, err := conn.Query("SELECT `content` FROM `feed_entry` WHERE id=%d", id)
 
 	if err != nil {
 		respondError( w, err.Error() ) 
@@ -185,7 +213,7 @@ func serveGetItem(w http.ResponseWriter, r *http.Request) {
 
 	//TODO:The update and replace statments should be in a transaction 
 	//TODO: Only insert into user_feed_readitems when the items is newer than the user_feeds.newest_read  
-	_, _, err = GetConnection().QueryFirst("REPLACE INTO `user_feed_readitems`(user_id,entry_id) VALUES (%d,%d)", userId, id)
+	_, _, err = conn.QueryFirst("REPLACE INTO `user_feed_readitems`(user_id,entry_id) VALUES (%d,%d)", userId, id)
 
 	if err != nil {
 		respondError( w, err.Error() ) 
@@ -199,7 +227,7 @@ func serveGetItem(w http.ResponseWriter, r *http.Request) {
 	}
 	*/
 	//TODO: Extremelly inneficient; Make better method
-	_, _, err = GetConnection().QueryFirst("CALL update_unread()")
+	_, _, err = conn.QueryFirst("CALL update_unread()")
 
 	if err != nil {
 		respondError( w, err.Error() ) 
@@ -215,9 +243,18 @@ func serveUpdateItemLabels(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "Not a post request.")
 		return
 	}
+
+	conn := GetConnection().Clone()
+
+	if err := conn.Connect(); err != nil {
+		respondError( w, err.Error() )
+		return
+	}
+
+	defer conn.Close()
 	
 	entryId, err := strconv.ParseInt(r.FormValue("id"), 10, 64)
-	labels := GetConnection().Escape( r.FormValue("labels") )
+	labels := conn.Escape( r.FormValue("labels") )
 	userId := 1
 
 	if err != nil {
@@ -232,7 +269,7 @@ func serveUpdateItemLabels(w http.ResponseWriter, r *http.Request) {
 		return fmt.Sprintf("INSERT IGNORE INTO `user_entry_label`(`user_id`,`feed_entry_id`,`label`) VALUES (%d,%d,'%s')", userId, entryId, labels )
 	}
 	
-	_, _, err = GetConnection().Query(getQuery())
+	_, _, err = conn.Query(getQuery())
 
 	if err != nil {
 		respondError( w, err.Error() )
@@ -288,7 +325,16 @@ func serveUpdateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	transaction, err := gConn.Begin()
+	conn := GetConnection().Clone()
+
+	if err := conn.Connect(); err  != nil {
+		respondError( w, err.Error() )
+		return
+	}
+
+	defer conn.Close()
+
+	transaction, err := conn.Begin()
 	if err != nil {
 		respondError( w, err.Error() ) 
 		return
@@ -333,7 +379,16 @@ func serveMarkRead(w http.ResponseWriter, r *http.Request) {
 		readFeeds = append(readFeeds, strconv.Itoa( id ) )
 	}
 
-	_, _, err = gConn.Query("UPDATE `user_feed` SET `newest_read`=NOW(), `unread_items`=0  WHERE user_id=%d AND feed_id IN (%s)",
+	conn := GetConnection().Clone()
+
+	if err := conn.Connect(); err  != nil {
+		respondError( w, err.Error() )
+		return
+	}
+
+	defer conn.Close()
+
+	_, _, err = conn.Query("UPDATE `user_feed` SET `newest_read`=NOW(), `unread_items`=0  WHERE user_id=%d AND feed_id IN (%s)",
 			userId,
 			strings.Join( readFeeds, "," ) )
 			
@@ -342,7 +397,7 @@ func serveMarkRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	_, _, err = gConn.Query("DELETE `user_feed_readitems` FROM `user_feed_readitems` INNER JOIN `feed_entry` ON `user_feed_readitems`.`entry_id` = `feed_entry`.`id` WHERE user_feed_readitems.`user_id`=%d AND `feed_entry`.`feed_id` IN (%s)",
+	_, _, err = conn.Query("DELETE `user_feed_readitems` FROM `user_feed_readitems` INNER JOIN `feed_entry` ON `user_feed_readitems`.`entry_id` = `feed_entry`.`id` WHERE user_feed_readitems.`user_id`=%d AND `feed_entry`.`feed_id` IN (%s)",
 			userId,
 			strings.Join( readFeeds, "," ) )
 			
@@ -354,6 +409,81 @@ func serveMarkRead(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "{\"success\":1}")
 }
 
+
+func serveAddFeed(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != "POST" {
+		w.WriteHeader(400)
+		fmt.Fprint(w, "Not a post request.")
+		return
+	}
+
+	var userId uint32 = 1
+	conn := GetConnection().Clone()
+	
+	var request struct {
+		Uri string
+	}
+	
+	decoder := json.NewDecoder(r.Body)
+
+	err := decoder.Decode(&request)
+	if err != nil {
+		respondError( w, err.Error() ) 
+		return
+	}
+
+	if err := conn.Connect(); err  != nil {
+		respondError( w, err.Error() )
+		return
+	}
+
+	defer conn.Close()
+
+	transaction, err := gConn.Begin()
+	
+	if err != nil {
+		respondError( w, err.Error() )
+		return
+	}
+	
+	rows, _, err := transaction.Query("SELECT `id` FROM `feed` WHERE `feedURL`='%s'", request.Uri)
+	var feedId uint64 = 0
+
+	if err != nil {
+		transaction.Rollback()
+		respondError( w, err.Error() )
+		return
+	}
+
+	if len(rows) > 0 {
+		feedId = rows[0].Uint64(0)
+	} else {
+
+		feedId, err = AddFeed(transaction, request.Uri)
+	
+		if err != nil {
+			transaction.Rollback()
+			respondError( w, err.Error() )
+			return
+		}
+	}
+
+	_, _, err = transaction.Query("INSERT INTO `user_feed`(`user_id`,`feed_id`,`newest_read`,`unread_items`,`active`) VALUES (%d, %d, %d,0,0)",
+		userId, 
+		feedId, 
+		time.Now().Unix() )
+
+	if err != nil {
+		transaction.Rollback()
+		respondError( w, err.Error() )
+		return
+	}
+
+	transaction.Commit()
+	fmt.Fprint(w, "{\"success\":1}")
+}
+
 func StartWebserver() {
 
 	http.HandleFunc("/home", serveHome )
@@ -362,6 +492,7 @@ func StartWebserver() {
 	http.HandleFunc("/updateLabels", serveUpdateItemLabels )
 	http.HandleFunc("/updateOrder", serveUpdateOrder )
 	http.HandleFunc("/markRead", serveMarkRead )
+	http.HandleFunc("/add", serveAddFeed )
 	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("web"))) )
 
 	http.ListenAndServe(":8080", nil)
